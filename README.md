@@ -1,11 +1,11 @@
-* この文書中の__私__とは、ActuaServerの開発者である阿久津鯖男(Sabao Akutsu)を指す。  
-* この文書中の__ここ__とは、このファイルがあるリポジトリのルートを指す。  
-* この文書中の___ActuaServer___とは、ここにあるActuaSvrフォルダ内の
+* この文書中の「私」とは、ActuaServerの開発者である阿久津鯖男(Sabao Akutsu)を指す。  
+* この文書中の「ここ」とは、このファイルがあるリポジトリのルートを指す。  
+* この文書中の「ActuaServer」とは、ここにあるActuaSvrフォルダ内の
 ファイル群をコンパイル、リンクして生成されるプログラムに対して私が与えた名称である。
 
 
 ##最初に
- ActuaServerは__Arduino__で安価なアクチュエータ（RCサーボ、ステッピングモータ、DCモータなど）
+ ActuaServerはArduinoで安価なアクチュエータ（RCサーボ、ステッピングモータ、DCモータなど）
  をリアルタイム制御するために製作いたしました。シリアル通信を利用して簡単なコマンドを送ることで
  複数のアクチュエータを同時に制御することが可能です。
  マルチタスク制御を実現する為、Quantum Leaps, LLC製QP frameworkのpreemptive QK kernelを採用しております。
@@ -17,7 +17,7 @@
 2. Arduino公式サイトから開発環境(IDE)をダウンロードします.。   <http://www.arduino.cc/>
 3. Arduino公式サイトからArduino用のQP frameworkをダウンロードします。  <http://playground.arduino.cc/Code/QP>  
   ドキュメントに従ってArduino IDEのフォルダに必要なフォルダをコピーします。  
-4. フレームワークに付属のpdfなどを参考にしてpreemptive QK kernelを使用出来るようヘッダファイルを変更します。qp&#x5f;port.hの二ヶ所のマクロ定義のコメントをはずすだけのはずです。 アップロードされているqp/libraries/qp/qp&#x5f;port.h はすでに変更済みです。  
+4. フレームワークに付属のpdfなどを参考にしてpreemptive QK kernelを使用出来るようヘッダファイルを変更します。qp&#x5f;port.hの二ヶ所のマクロ定義のコメントをはずすだけのはずです。 ここにあるqp/libraries/qp/qp&#x5f;port.h はすでに変更済みです。  
 5. リポジトリをforkしてArduino IDE のsketchbookフォルダにActuaSvrフォルダをコピーします。  
 （またはsketchbookにActuaSvrへのリンクを置いてもよいと思います）  
 6. Arduino IDE でActuaSvrを開き、Arduino本体へプログラムをアップロードします。
@@ -26,7 +26,7 @@
 ##改変部分について 
 ActuaServerに関する全てのソースコードはArduino用QP frameworkサンプルプログラム
  （DPP example, qp/examples/qp/qp&#x5f;dpp&#x5f;qk）に改変を加えて作成されました
- （実際に改変を行ったのはここに同梱されているものより以前のバージョンのものです）。 
+ （実際に改変を行ったのはここにあるものより以前のバージョンのものです）。 
  本来ならば元のファイル（qp&#x5f;dpp&#x5f;qkの中のファイル）のどこをどのように改変したのか
  明示するべきですが、 改変部分は多岐に及んでおり （元のファイル名も変更しております）
  それら全てを明示して公開するのはかえって混乱を招くかもしれません。
@@ -38,16 +38,15 @@ ActuaServerに関する全てのソースコードはArduino用QP frameworkサ�
 バージョンアップされたようでActuaServerにはそれに対応するために
 間に合わせの変更を加えてあります（namespaceの使用）。
 今現在Quantum Leaps, LLCからQP frameworkを入手するとまたバージョンアップしているかも知れませんが、
-少なくともここに同梱されているバージョンのQP frameworkであれば動作すると思います。
-上記__ActuaServer実行までの手順__でQP frameworkを導入して
+少なくともここにあるバージョンのQP frameworkであれば動作すると思います。
+上記「ActuaServer実行までの手順」でQP frameworkを導入して
 ActuaSvrのコンパイルエラーが起こる場合は、バージョンの違いが原因かも知れません。
-その場合、ここにアップロードされているQP framework（qpフォルダ）を同じ手順で試してみて下さい。）
+その場合、ここにあるQP framework（qpフォルダ）を同じ手順で試してみて下さい。）
 
 
 ##QP frameworkとActuaServerの著作権について
  QP frameworkそのものとそのサンプルプログラムの著作権はQuantum Leaps, LLCが有しています。
- QP frameworkの著作権とライセンスに関しての詳細はここにアップロードされた
- qp/copying.txtファイルをご覧下さい。
+ QP frameworkの著作権とライセンスに関しての詳細はここにあるqp/copying.txtファイルをご覧下さい。
  上記の通りActuaServerはサンプルプログラムを改変して作られており、また各クラスは
  QP frameworkの機能と分かち難く結びついている事情から、各ソースファイルの冒頭に記した
  著作権者の表記は元の作成者であるQuantum Leaps, LLCとその改変者である私との併記と致しました。
@@ -64,10 +63,9 @@ ActuaSvrのコンパイルエラーが起こる場合は、バージョンの違
  Quantum Leaps, LLCが運営するサイトのアナウンスによれば、
  「このウェブサイトからダウンロード出来る全てのQP framework softwereは
  GPLv2またはそれ以降のパージョンでリリースできる」となっておりましたので、
- 私は利便性を考え今回ActuaServerに__GPLv3__（GPLv2では改変した全てのファイルに
+ 私は利便性を考え今回ActuaServerにGPLv3（GPLv2では改変した全てのファイルに
  その旨を記載する必要があるようです）を添付することと致しました。
- GPLv3の下であなたに与えられた自由の権利と義務に関する詳細は
- ここのルートにある__LICENSE__ファイルをお読み下さい。
+ GPLv3の下であなたに与えられた自由の権利と義務に関する詳細はここにあるLICENSEファイルをお読み下さい。
 
 
 ##最後に
@@ -77,4 +75,4 @@ ActuaSvrのコンパイルエラーが起こる場合は、バージョンの違
  
 私以外の者がこの文書を改変することは禁ずる。
  					
- 阿久津鯖男（Sabao Akutsu） Mar. 30, 2013
+ 阿久津鯖男（Sabao Akutsu） Apr. 2, 2013
