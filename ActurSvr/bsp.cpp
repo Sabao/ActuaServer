@@ -70,7 +70,7 @@ void BSP_init(void) {
     DDRB  = 0xFF;                     // All PORTB pins are outputs (user LED)
     PORTB = 0x00;                                        // drive all pins low    
     
-    Serial.begin(115200);
+    Serial.begin(115200, SERIAL_8E1);
     
     char msg[20] = {'@',};
     char temp[4] = {'\0'};    

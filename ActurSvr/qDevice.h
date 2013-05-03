@@ -29,7 +29,7 @@
 #include <Servo.h>
 
 #define PROC_id        1
-#define TOTAL_OF_DEV   3
+#define TOTAL_OF_DEV   4
 #define cmdSIZE       20
 
 enum qdSignals {
