@@ -71,14 +71,6 @@ void BSP_init(void) {
     PORTB = 0x00;                                        // drive all pins low    
     
     Serial.begin(115200, SERIAL_8E1);
-    
-    char msg[20] = {'@',};
-    char temp[4] = {'\0'};    
-    uint8_t p_id = PROC_id;    
-    strcat(msg, itoa(p_id, temp, 10));
-    strcat(msg, "|0,prompt.\n");
-    
-    p_si->EnqueueCmd(msg);
 
     if (QS_INIT((void *)0) == 0) {       // initialize the QS software tracing
         Q_ERROR();
