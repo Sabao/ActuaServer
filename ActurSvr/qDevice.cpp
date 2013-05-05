@@ -67,8 +67,8 @@ QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 : 
 QActive(h),
 devID(id), clbkfunc(p) {
-  firstblk = NULL; 
-  lastblk  = NULL;
+  first = NULL; 
+  last  = NULL;
 #ifdef TOTAL_OF_DEV
   dev_tbl[ id & 0x3F ] = this;
 #endif
@@ -79,7 +79,7 @@ uint8_t QDevice::getID() {
 }
 
 bool QDevice::rsv() {
-  if (firstblk != NULL) {
+  if (first != NULL) {
     return true;
   } else {
     return false;
@@ -113,7 +113,7 @@ bool QDevice::CmdDivider(const char* cmd) {
   int8_t id = check_id(cmd);
   if(id < 0) { return false; }
 
-  if((firstblk != NULL) && (!(id & INTERRUPT))) {
+  if((first != NULL) && (!(id & INTERRUPT))) {
     EnqueueCmd(cmd);
     return false;
   }
@@ -159,20 +159,20 @@ bool QDevice::CmdDivider(const char* cmd) {
 bool QDevice::EnqueueCmd(const char *cmd) {
 
   if(check_id(cmd) >= 0) {
-    void* newblk;
-    if(newblk = malloc(sizeof(QueueBlock))) {
+    void* new_que;
+    if(new_que = malloc(sizeof(CmdQueue))) {
 
-      if(lastblk == NULL) {
-        lastblk = (QueueBlock*)newblk;
-        firstblk = lastblk;
+      if(last == NULL) {
+        last = (CmdQueue*)new_que;
+        first = last;
       }
       else {
-        lastblk->nextblk = (QueueBlock*)newblk;
-        lastblk = lastblk->nextblk;
+        last->next = (CmdQueue*)new_que;
+        last = last->next;
       }
 
-      lastblk->nextblk = NULL;    
-      strcpy(lastblk->cmdString, cmd);
+      last->next = NULL;    
+      strcpy(last->cmdString, cmd);
       return true;
     } else {
       FlushQueue();
@@ -185,18 +185,18 @@ bool QDevice::EnqueueCmd(const char *cmd) {
 
 bool QDevice::DequeueCmd() {
 
-  if(firstblk != NULL) {
+  if(first != NULL) {
 
-    QueueBlock* temp = firstblk;
+    CmdQueue* temp = first;
 
-    firstblk = NULL;
+    first = NULL;
     CmdDivider(temp->cmdString);
 
-    if(temp->nextblk != NULL) {
-      firstblk = temp->nextblk;
+    if(temp->next != NULL) {
+      first = temp->next;
     }
     else {
-      lastblk = NULL;
+      last = NULL;
     }
 
     free(temp);
@@ -206,21 +206,21 @@ bool QDevice::DequeueCmd() {
 };
 
 void QDevice::FlushQueue() {
-  if(firstblk == NULL) { 
+  if(first == NULL) { 
     return; 
   }
 
-  QueueBlock* flushblk = firstblk;
-  QueueBlock* nextflushblk = NULL;
+  CmdQueue* flush_que = first;
+  CmdQueue* nextflush_que = NULL;
 
   do {
 
-    nextflushblk = flushblk->nextblk;
-    free(flushblk);
-    flushblk = nextflushblk;
+    nextflush_que = flush_que->next;
+    free(flush_que);
+    flush_que = nextflush_que;
 
   } 
-  while(flushblk != NULL);
+  while(flush_que != NULL);
 
 }
 

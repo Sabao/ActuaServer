@@ -81,8 +81,8 @@ struct CmdInfo {
   int16_t        cmdValue[2];
 };
 
-struct QueueBlock {
-  QueueBlock* nextblk;
+struct CmdQueue {
+  CmdQueue* next;
   char cmdString[cmdSIZE];
 };
 
@@ -99,8 +99,8 @@ class QDevice : public QP::QActive {
     int8_t  check_id(const char*);
     void    send_cmd(const char*, uint8_t, char);
     
-    QueueBlock*  firstblk;
-    QueueBlock*  lastblk;
+    CmdQueue*  first;
+    CmdQueue*  last;
 
   public:
     QDevice(
