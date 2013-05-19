@@ -33,9 +33,8 @@ Q_DEFINE_THIS_FILE
 */
 
 static SerialInterface l_si(192); //SerialInterface objects(Do not delete!)
-static LEDgroup ledgroup(1,9,11);
-static ArduServo arsvo1(2, 5);
-static ArduServo arsvo2(3, 6);
+static LEDgroup ledgroup(1, 9, 11);
+static trickLEDgroup trickledgroup(2, 5, 7);
 
 //Pointer that this application depends ---------------------------------------
 SerialInterface* p_si = &l_si; //(Do not delete!)

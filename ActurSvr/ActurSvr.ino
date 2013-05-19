@@ -61,4 +61,3 @@ void setup() {
 //////////////////////////////////////////////////////////////////////////////
 // NOTE: Do not define the loop() function, because this function is
 // already defined in the QP port to Arduino
-// ssh test

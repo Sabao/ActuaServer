@@ -70,7 +70,7 @@ void BSP_init(void) {
     DDRB  = 0xFF;                     // All PORTB pins are outputs (user LED)
     PORTB = 0x00;                                        // drive all pins low    
     
-    Serial.begin(115200, SERIAL_8E1);
+    Serial.begin(115200);
 
     if (QS_INIT((void *)0) == 0) {       // initialize the QS software tracing
         Q_ERROR();

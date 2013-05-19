@@ -629,7 +629,7 @@ void SerialInterface::CmdExecutor(SerialInterface* me, CmdInfo* p) {
 //............................................................................
 
 LEDgroup::LEDgroup(uint8_t id, uint8_t s, uint8_t e, uint16_t itr)
-: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
+: QDevice(id, (QDcmdHandler)&CmdExecutor, (QStateHandler)initial),
 m_timeEvt(TIMEOUT_SIG), s_pin(s), e_pin(e) {       
   cur_pin = s;    
   itrvl = itr;
@@ -1655,3 +1655,79 @@ void QDevMortorVref::CmdExecutor(QDevMortorVref* me, CmdInfo* p) {
   }
 }
 //............................................................................
+
+trickLEDgroup::trickLEDgroup(uint8_t id, uint8_t s, uint8_t e, uint16_t itr)
+: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
+m_timeEvt(TIMEOUT_SIG), s_pin(s), e_pin(e) {       
+  cur_pin = s;    
+  itrvl = itr;
+
+  uint8_t i;
+  for(i = s_pin; i <= e_pin; ++i) {
+    pinMode(i, OUTPUT);
+  }    
+}
+
+QState trickLEDgroup::initial(trickLEDgroup *me, QEvent const *) {
+  me->subscribe(BROAD_COMM_SIG);
+  digitalWrite(me->cur_pin, HIGH);
+  me->m_timeEvt.postIn(me, me->itrvl);
+  return Q_TRAN(&trickLEDgroup::blinkForward);
+}
+
+QState trickLEDgroup::blinkForward(trickLEDgroup *me, QEvent const *e) {
+  switch (e->sig) {
+  case Q_ENTRY_SIG: 
+    {
+      return Q_HANDLED();
+    }
+  case BROAD_COMM_SIG: 
+    {
+      me->CmdDivider(((CommandEvt *)e)->CommStr);
+      return Q_HANDLED();
+    }
+  case TIMEOUT_SIG: 
+    {
+      digitalWrite(me->cur_pin, LOW); 
+      ++me->cur_pin;
+      digitalWrite(me->cur_pin, HIGH);
+
+      me->m_timeEvt.postIn(me, me->itrvl);              
+      if(me->cur_pin == me->e_pin) return Q_TRAN(&trickLEDgroup::blinkBackward);
+
+      return Q_HANDLED();
+    }
+  }
+  return Q_SUPER(&QHsm::top);
+}
+
+QState trickLEDgroup::blinkBackward(trickLEDgroup *me, QEvent const *e) {
+  switch (e->sig) {
+  case Q_ENTRY_SIG: 
+    {
+      return Q_HANDLED();
+    }
+  case BROAD_COMM_SIG: 
+    {
+      me->CmdDivider(((CommandEvt *)e)->CommStr);
+      return Q_HANDLED();
+    }
+  case TIMEOUT_SIG: 
+    {
+      digitalWrite(me->cur_pin, LOW); 
+      --me->cur_pin;
+      digitalWrite(me->cur_pin, HIGH);
+
+      me->m_timeEvt.postIn(me, me->itrvl);              
+      if(me->cur_pin == me->s_pin) return Q_TRAN(&trickLEDgroup::blinkForward);
+
+      return Q_HANDLED();
+    }
+  }
+  return Q_SUPER(&QHsm::top);
+}
+
+void trickLEDgroup::CmdExecutor(trickLEDgroup* me, CmdInfo* p) {
+  Serial.println("trick!");
+  for(;;);
+}

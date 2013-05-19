@@ -29,7 +29,7 @@
 #include <Servo.h>
 
 #define PROC_id        1
-#define TOTAL_OF_DEV   4
+#define TOTAL_OF_DEV   3
 #define cmdSIZE       20
 
 enum qdSignals {
@@ -402,6 +402,33 @@ class QDevMortorVref : public QDevice {
     static QP::QState onIdle  (QDevMortorVref *me, QP::QEvent const *e);
 };
 
+//............................................................................
+
+class trickLEDgroup : public QDevice {
+  private:
+    QP::QTimeEvt m_timeEvt;
+
+  public:
+    trickLEDgroup(
+      uint8_t,
+      uint8_t,
+      uint8_t,
+      uint16_t itr = 1000
+    );
+
+  private:
+    const uint8_t s_pin;
+    const uint8_t e_pin;
+
+    uint8_t cur_pin;
+    uint16_t itrvl;
+    
+  static void CmdExecutor(trickLEDgroup* me, CmdInfo* p);
+
+  static QP::QState initial (trickLEDgroup *me, QP::QEvent const *e);
+  static QP::QState blinkForward(trickLEDgroup *me, QP::QEvent const *e);
+  static QP::QState blinkBackward(trickLEDgroup *me, QP::QEvent const *e);
+};
 //............................................................................
 
 #endif
