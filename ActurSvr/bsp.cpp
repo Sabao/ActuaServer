@@ -60,7 +60,7 @@ ISR(TIMER2_COMPA_vect) {
 
     QF::TICK(&l_TIMER2_COMPA);                // process all armed time events
     
-    p_si->On_ISR();
+    //p_si->On_ISR();
     
     QK_ISR_EXIT();                    // inform QK kernel about exiting an ISR
 }
@@ -92,6 +92,9 @@ void QF::onStartup(void) {
 void QF::onCleanup(void) {
 }
 //............................................................................
+extern int16_t a_count;
+extern int16_t b_count;
+
 void QK::onIdle() {
 
     QF_INT_DISABLE();
@@ -106,8 +109,20 @@ void QK::onIdle() {
     SMCR = 0;                                              // clear the SE bit
 
 #endif
+    
+    if(a_count > 299) {
+      
+      Serial.print("task a :");
+      Serial.println(a_count);
+      
+      Serial.print("task b :");
+      Serial.println(b_count);
+      Serial.println("===========");
+      
+      a_count = 0;
+      b_count = 0;
+    }
 }
-
 //............................................................................
 void Q_onAssert(char const Q_ROM * const Q_ROM_VAR file, int line) {
     QF_INT_DISABLE();                                // disable all interrupts

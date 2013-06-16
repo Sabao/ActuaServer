@@ -431,5 +431,32 @@ class trickLEDgroup : public QDevice {
 };
 //............................................................................
 
+class task_a : public QDevice {
+  private:
+    QP::QTimeEvt m_timeEvt;
+
+  public:
+    task_a(uint8_t);
+
+  static void CmdExecutor(task_a*, CmdInfo*);
+
+  static QP::QState initial (task_a *me, QP::QEvent const *e);
+  static QP::QState doing (task_a *me, QP::QEvent const *e);
+};
+
+class task_b : public QDevice {
+  private:
+    QP::QTimeEvt m_timeEvt;
+
+  public:
+    task_b(uint8_t);
+
+  static void CmdExecutor(task_b*, CmdInfo*);
+
+  static QP::QState initial (task_b *me, QP::QEvent const *e);
+  static QP::QState doing (task_b *me, QP::QEvent const *e);
+};
+
+//............................................................................
 #endif
 

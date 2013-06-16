@@ -32,12 +32,16 @@ Q_DEFINE_THIS_FILE
   Count number of devices, and MODIFY macro 'TOTAL_OF_DEV' definition in qDevice.h.
 */
 
-static SerialInterface l_si(192); //SerialInterface objects(Do not delete!)
-static LEDgroup ledgroup(1, 9, 11);
-static trickLEDgroup trickledgroup(2, 5, 7);
+uint16_t a_count = 0;
+uint16_t b_count = 0;
+
+//static SerialInterface l_si(192); //SerialInterface objects(Do not delete!)
+static task_b t_b(0);
+static task_a t_a(1);
+
 
 //Pointer that this application depends ---------------------------------------
-SerialInterface* p_si = &l_si; //(Do not delete!)
+//SerialInterface* p_si = &l_si; //(Do not delete!)
 //ServoTact* p_tact = &;
 
 //////////////////////////////////////////////////////////////////////////////

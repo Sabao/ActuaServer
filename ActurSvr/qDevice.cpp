@@ -1731,3 +1731,63 @@ void trickLEDgroup::CmdExecutor(trickLEDgroup* me, CmdInfo* p) {
   Serial.println("trick!");
   for(;;);
 }
+//............................................................................
+extern int16_t a_count;
+extern int16_t b_count;
+
+task_a::task_a(uint8_t id)
+: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
+m_timeEvt(TIMEOUT_SIG){}
+
+QState task_a::initial(task_a *me, QEvent const *) {
+  me->m_timeEvt.postEvery(me, 10);
+  return Q_TRAN(&task_a::doing);
+}
+
+QState task_a::doing(task_a *me, QEvent const *e) {
+  switch (e->sig) {
+  case Q_ENTRY_SIG: 
+    {
+      return Q_HANDLED();
+    }
+  case TIMEOUT_SIG:
+    {
+      delay(5);
+      ++a_count;
+      return Q_HANDLED();
+    }
+  }
+  return Q_SUPER(&QHsm::top);
+}
+
+void task_a::CmdExecutor(task_a* me, CmdInfo* p) {}
+
+task_b::task_b(uint8_t id)
+: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
+m_timeEvt(TIMEOUT_SIG){}
+
+QState task_b::initial(task_b *me, QEvent const *) {
+  //me->m_timeEvt.postEvery(me, 15);
+  me->m_timeEvt.postIn(me, 15);
+  return Q_TRAN(&task_b::doing);
+}
+
+QState task_b::doing(task_b *me, QEvent const *e) {
+  switch (e->sig) {
+  case Q_ENTRY_SIG: 
+    {
+      return Q_HANDLED();
+    }
+  case TIMEOUT_SIG:
+    {      
+      ++b_count;
+      me->m_timeEvt.postIn(me, 15);
+      return Q_HANDLED();
+    }
+  }
+  return Q_SUPER(&QHsm::top);
+}
+
+void task_b::CmdExecutor(task_b* me, CmdInfo* p) {}
+
+//............................................................................
