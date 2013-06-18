@@ -29,7 +29,7 @@
 
 using namespace QP;
 
-QActive* dev_tbl[TOTAL_OF_DEV] = { NULL };
+QDevice* dev_tbl[TOTAL_OF_DEV] = { NULL };
 
 // Local-scope objects -------------------------------------------------------
 static union SmallEvents {
