@@ -61,33 +61,22 @@ bool QDevice::rsv() {
   }
 }
 
-int8_t QDevice::check_id(const char* cmd) {
+bool QDevice::CmdDivider(const char* cmd) {
   
   char *p = strchr(cmd, '|');
   
   if (p == NULL) {
-    return -1;
+    return false;
   } else {
     ++p;
   }
   
   uint8_t id = atoi(p);
-  if(((id & 0x3F) != (devID & 0x3F)) && (!(devID & NO_RETURN))) { 
-    return -1;
-  }  
 
   if(id & FLUSH_QUEUE) {
     FlushQueue();
   }
   
-  return id;  
-}
-
-bool QDevice::CmdDivider(const char* cmd) {
-  
-  int8_t id = check_id(cmd);
-  if(id < 0) { return false; }
-
   if((first != NULL) && (!(id & INTERRUPT))) {
     EnqueueCmd(cmd);
     return false;
@@ -133,29 +122,25 @@ bool QDevice::CmdDivider(const char* cmd) {
 
 bool QDevice::EnqueueCmd(const char *cmd) {
 
-  if(check_id(cmd) >= 0) {
-    void* new_que;
-    if(new_que = malloc(sizeof(CmdQueue))) {
+  void* new_que;
+  if(new_que = malloc(sizeof(CmdQueue))) {
 
-      if(last == NULL) {
-        last = (CmdQueue*)new_que;
-        first = last;
-      }
-      else {
-        last->next = (CmdQueue*)new_que;
-        last = last->next;
-      }
-
-      last->next = NULL;    
-      strcpy(last->cmdString, cmd);
-      return true;
-    } else {
-      FlushQueue();
-      return false;
+    if(last == NULL) {
+      last = (CmdQueue*)new_que;
+      first = last;
     }
+    else {
+      last->next = (CmdQueue*)new_que;
+      last = last->next;
+    }
+
+    last->next = NULL;    
+    strcpy(last->cmdString, cmd);
+    return true;
   } else {
+    FlushQueue();
     return false;
-  }
+  } 
 };
 
 bool QDevice::DequeueCmd() {
@@ -288,10 +273,6 @@ void QDevice::send_cmd(const char*s, uint8_t oid, char c) {
       strcpy(pe->CommStr, s);
       dev_tbl[oid]->POST(pe, this);
     }
-  } else {
-    CommandEvt* pe = Q_NEW(CommandEvt, BROAD_COMM_SIG);
-    strcpy(pe->CommStr, s);
-    QF::publish(pe);
   }
 }
 
@@ -446,7 +427,6 @@ void SerialInterface::On_ISR() {
       if (c == '\n' || (rp - read_buf) > cmdSIZE - 2) {
         switch (*read_buf) {
           case '<':
-          case '[':
           case ')':
           case '~':
           {
@@ -504,17 +484,6 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
                 dev_tbl[ai]->POST(pe, me);
               }
             }
-          }
-          break;
-        }
-        case '[':
-        {
-          if (atoi(me->read_buf + 1) == PROC_id) {
-            CommandEvt* pe = Q_NEW(CommandEvt, BROAD_COMM_SIG);
-            *(me->read_buf) = ']';
-            Serial.print(me->read_buf);
-            strcpy(pe->CommStr, me->read_buf);
-            QF::publish(pe);
           }
           break;
         }

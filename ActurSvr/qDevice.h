@@ -62,7 +62,6 @@ struct CommandEvt : public QP::QEvent {
 #define FLUSH_QUEUE  64
 
 //devID
-#define NO_RETURN    128
 #define NO_ARRAY     64
 
 #define WAVE_DRIVE   0x11
@@ -96,8 +95,7 @@ class QDevice : public QP::QActive {
   private:
     const    QDcmdHandler clbkfunc;
     const    uint8_t devID;
-    int8_t  check_id(const char*);
-    void    send_cmd(const char*, uint8_t, char);
+    void     send_cmd(const char*, uint8_t, char);
     
     CmdQueue*  first;
     CmdQueue*  last;
