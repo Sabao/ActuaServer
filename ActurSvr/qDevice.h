@@ -29,12 +29,11 @@
 #include <Servo.h>
 
 #define PROC_id        1
-#define TOTAL_OF_DEV   4
+#define TOTAL_OF_DEV   2
 #define cmdSIZE       20
 
-enum qdSignals {
-   BROAD_COMM_SIG = QP::Q_USER_SIG,
-   SI_EMGCY_SIG,
+enum qdSignals { 
+   SI_EMGCY_SIG = QP::Q_USER_SIG,
    MAX_PUB_SIG,
    MAX_SIG
 };
@@ -49,12 +48,6 @@ enum InternalSignals {
   SI_CHK_ALIVE_SIG,
   SI_RETURN_SIG,
   SI_DEQUE_SIG
-};
-
-struct MsgEvt : public QP::QEvent {};
-
-struct CommandEvt : public QP::QEvent {
-    char CommStr[cmdSIZE];
 };
 
 //command

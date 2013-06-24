@@ -29,12 +29,12 @@
 
 using namespace QP;
 
-QDevice* dev_tbl[TOTAL_OF_DEV] = { NULL };
+QActive* dev_tbl[TOTAL_OF_DEV] = { NULL };
 
 // Local-scope objects -------------------------------------------------------
 static union SmallEvents {
   void      *e0;
-  uint8_t   e1[sizeof(CommandEvt)];
+  uint8_t   e1[sizeof(QEvent)];
 } l_smlPoolSto[TOTAL_OF_DEV];
 
 static QEvent const *l_DeviceQueueSto[TOTAL_OF_DEV][1];

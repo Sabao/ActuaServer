@@ -269,9 +269,7 @@ void QDevice::InternalCmd(uint8_t id, char val1, char val2, char c = '<') {
 void QDevice::send_cmd(const char*s, uint8_t oid, char c) {
   if (c == '<') {
     if( oid <= TOTAL_OF_DEV && dev_tbl[oid] != NULL ) {
-      CommandEvt* pe = Q_NEW(CommandEvt, BROAD_COMM_SIG);
-      strcpy(pe->CommStr, s);
-      dev_tbl[oid]->POST(pe, this);
+      ((QDevice*)dev_tbl[oid])->EnqueueCmd(s);
     }
   }
 }
@@ -410,7 +408,7 @@ void SerialInterface::On_ISR() {
     if (Serial.available() > 0) {
       c = Serial.read();
       if (c == '^') {
-        MsgEvt* pe = Q_NEW(MsgEvt, SI_RETURN_SIG);
+        QEvent* pe = Q_NEW(QEvent, SI_RETURN_SIG);
         this->POST(pe, this);
       }
     }
@@ -429,9 +427,9 @@ void SerialInterface::On_ISR() {
           case '<':
           case ')':
           case '~':
-          {
+          {    
             stat_flg |= SHUT;
-            MsgEvt* pe = Q_NEW(MsgEvt, SI_END_LINE_SIG);
+            QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
             this->POST(pe, this);
             rp = read_buf;
             break;
@@ -447,14 +445,14 @@ void SerialInterface::On_ISR() {
     } else if (c == '\n') {
       if (rsv()) {
         stat_flg |= SHUT;
-        MsgEvt* pe = Q_NEW(MsgEvt, SI_DEQUE_SIG);
+        QEvent* pe = Q_NEW(QEvent, SI_DEQUE_SIG);
         this->POST(pe, this); 
       }
     }
   }
 }
 
-QState SerialInterface::initial(SerialInterface *me, QEvent const *) {
+QState SerialInterface::initial(SerialInterface *me, QEvent const *e) {
   me->m_keep_alive_timer.postIn(me, 250);
   me->subscribe(SI_EMGCY_SIG);
   return Q_TRAN(&SerialInterface::Exchange);
@@ -470,18 +468,14 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
     {
       switch (*(me->read_buf)) {
         case '<':
-        {
+        {          
           if (atoi(me->read_buf + 1) == PROC_id) {
             char *p = strchr(me->read_buf, '|');
             if (p != NULL) {
               p++;
               uint8_t ai = atoi(p);
-              if( (ai <= TOTAL_OF_DEV) && (dev_tbl[ai] != NULL) ) {
-                CommandEvt* pe = Q_NEW(CommandEvt, BROAD_COMM_SIG);
-                *(me->read_buf) = '>';
-                Serial.print(me->read_buf);
-                strcpy(pe->CommStr, me->read_buf);
-                dev_tbl[ai]->POST(pe, me);
+              if( (ai <= TOTAL_OF_DEV) && (dev_tbl[ai] != NULL) ) {                
+                ((QDevice*)dev_tbl[ai])->CmdDivider(me->read_buf);
               }
             }
           }
@@ -520,7 +514,7 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
           me->stat_flg &= ~ALIVE;
         } else {
           me->stat_flg |= EMGCY;
-          MsgEvt* pe = Q_NEW(MsgEvt, SI_EMGCY_SIG);
+          QEvent* pe = Q_NEW(QEvent, SI_EMGCY_SIG);
           QF::publish(pe);
         }          
       } else {
@@ -544,7 +538,7 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
       memset(me->check_buf, 0, sizeof(me->check_buf));
       me->rp = me->read_buf;
       me->c = '\0';
-      MsgEvt* pe = Q_NEW(MsgEvt, SI_CHK_ALIVE_SIG);
+      QEvent* pe = Q_NEW(QEvent, SI_CHK_ALIVE_SIG);
       me->POST(pe, me);    
       return Q_HANDLED();
     }
@@ -585,7 +579,6 @@ m_timeEvt(TIMEOUT_SIG), s_pin(s), e_pin(e) {
 }
 
 QState LEDgroup::initial(LEDgroup *me, QEvent const *) {
-  me->subscribe(BROAD_COMM_SIG);
   digitalWrite(me->cur_pin, HIGH);
   me->m_timeEvt.postIn(me, me->itrvl);
   return Q_TRAN(&LEDgroup::blinkForward);
@@ -597,20 +590,15 @@ QState LEDgroup::blinkForward(LEDgroup *me, QEvent const *e) {
     {
       return Q_HANDLED();
     }
-  case BROAD_COMM_SIG: 
-    {
-      me->CmdDivider(((CommandEvt *)e)->CommStr);
-      return Q_HANDLED();
-    }
   case TIMEOUT_SIG: 
     {
       digitalWrite(me->cur_pin, LOW); 
       ++me->cur_pin;
       digitalWrite(me->cur_pin, HIGH);
 
-      me->m_timeEvt.postIn(me, me->itrvl);              
+      me->m_timeEvt.postIn(me, me->itrvl);
+      
       if(me->cur_pin == me->e_pin) return Q_TRAN(&LEDgroup::blinkBackward);
-
       return Q_HANDLED();
     }
   }
@@ -623,20 +611,15 @@ QState LEDgroup::blinkBackward(LEDgroup *me, QEvent const *e) {
     {
       return Q_HANDLED();
     }
-  case BROAD_COMM_SIG: 
-    {
-      me->CmdDivider(((CommandEvt *)e)->CommStr);
-      return Q_HANDLED();
-    }
   case TIMEOUT_SIG: 
     {
       digitalWrite(me->cur_pin, LOW); 
       --me->cur_pin;
       digitalWrite(me->cur_pin, HIGH);
 
-      me->m_timeEvt.postIn(me, me->itrvl);              
+      me->m_timeEvt.postIn(me, me->itrvl);
+      
       if(me->cur_pin == me->s_pin) return Q_TRAN(&LEDgroup::blinkForward);
-
       return Q_HANDLED();
     }
   }
@@ -648,7 +631,7 @@ void LEDgroup::CmdExecutor(LEDgroup* me, CmdInfo* p) {
   //Write your class-depended code under here.
   if(p->cmdValue[0] != 0) {    
     me->itrvl = p->cmdValue[0];
-  }
+  }  
 }
 
 //............................................................................
