@@ -71,7 +71,7 @@ bool QDevice::CmdDivider(const char* cmd) {
     ++p;
   }
   
-  uint8_t id = atoi(p);
+  uint8_t id = strtol(p, NULL, 10);
 
   if(id & FLUSH_QUEUE) {
     FlushQueue();
@@ -101,7 +101,7 @@ bool QDevice::CmdDivider(const char* cmd) {
     for(i = 0; ch != NULL ; i++) {
       if(i < 2) {
         strncpy(&cmdinfo.cmdLetter[i], ch, 1);
-        cmdinfo.cmdValue[i] = atoi(ch);
+        cmdinfo.cmdValue[i] = strtol(ch, NULL, 10);
       }
       ch = strtok(NULL,",");
     }
@@ -466,16 +466,29 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
     }
     case SI_END_LINE_SIG:
     {
+      char*    p;
+      char*    endp;
+      uint8_t  i;
+      
       switch (*(me->read_buf)) {
         case '<':
         {          
-          if (atoi(me->read_buf + 1) == PROC_id) {
-            char *p = strchr(me->read_buf, '|');
+          p = me->read_buf + 1;
+          i = strtol(p, &endp, 10);
+          
+          if (p == endp) { break; }
+          
+          if (i == PROC_id) {
+            p = strchr(me->read_buf, '|');
+            
             if (p != NULL) {
               p++;
-              uint8_t ai = atoi(p);
-              if( (ai <= TOTAL_OF_DEV) && (dev_tbl[ai] != NULL) ) {                
-                ((QDevice*)dev_tbl[ai])->CmdDivider(me->read_buf);
+              i = strtol(p, &endp, 10);
+              
+              if (p == endp) { break; }
+              
+              if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL) ) {                
+                ((QDevice*)dev_tbl[i])->CmdDivider(me->read_buf);
               }
             }
           }
@@ -483,9 +496,18 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
         }
         case ')':
         {
-          char *p = strchr(me->read_buf, '*') + 1;
-          if (atoi(p) == PROC_id) {
-            if (strcmp((me->read_buf + 1) , (me->check_buf + 1)) != 0) {
+          p = me->read_buf + 1;
+          i = strtol(p, &endp, 10);
+          
+          if (p == endp) {
+              me->stat_flg |= EMGCY;
+              me->stat_flg &= ~STAY;
+              me->stat_flg &= ~ALIVE;
+              break;
+            }
+          
+          if (i == PROC_id) {
+            if ((strcmp(p , (me->check_buf + 1)) != 0)) {
               me->stat_flg |= EMGCY;
               me->stat_flg &= ~STAY;
               me->stat_flg &= ~ALIVE;

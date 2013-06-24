@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <Servo.h>
 
-#define PROC_id        1
+#define PROC_id        0
 #define TOTAL_OF_DEV   2
 #define cmdSIZE       20
 
