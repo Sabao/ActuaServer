@@ -63,51 +63,30 @@ bool QDevice::rsv() {
 
 bool QDevice::CmdDivider(const char* cmd) {
   
-  char *p = strchr(cmd, '|');
+  CmdInfo cmdinfo = {0};
   
+  char* ch;
+  char* p = strchr(cmd, ',');
+    
   if (p == NULL) {
     return false;
   } else {
-    ++p;
+    ch = strtok(++p,",");
   }
+    
+  strcpy(cmdinfo.buffcpy, p);
+  uint8_t i;
   
-  uint8_t id = strtol(p, NULL, 10);
+  for(i = 0; ch != NULL ; i++) {
+    if(i < 2) {
+      strncpy(&cmdinfo.cmdLetter[i], ch, 1);
+      cmdinfo.cmdValue[i] = strtol(ch, NULL, 10);
+    }
+    ch = strtok(NULL,",");
+  }
+    
+  if(i > 2) { return false; }    
 
-  if(id & FLUSH_QUEUE) {
-    FlushQueue();
-  }
-  
-  if((first != NULL) && (!(id & INTERRUPT))) {
-    EnqueueCmd(cmd);
-    return false;
-  }
-  
-  CmdInfo cmdinfo = {0};
-  
-  if (!(devID & NO_ARRAY)) {
-    
-    char* ch;
-    char* p = strchr(cmd, ',');
-    
-    if (p == NULL) {
-      return false;
-    } else {
-      ch = strtok(++p,",");
-    }
-    
-    strcpy(cmdinfo.buffcpy, p);
-    uint8_t i;
-    
-    for(i = 0; ch != NULL ; i++) {
-      if(i < 2) {
-        strncpy(&cmdinfo.cmdLetter[i], ch, 1);
-        cmdinfo.cmdValue[i] = strtol(ch, NULL, 10);
-      }
-      ch = strtok(NULL,",");
-    }
-    
-    if(i > 2) { return false; }    
-  }
   
   if (this != p_si && (*cmd == '@')) {
     p_si->EnqueueCmd(cmd);
@@ -166,7 +145,8 @@ bool QDevice::DequeueCmd() {
 };
 
 void QDevice::FlushQueue() {
-  if(first == NULL) { 
+
+  if(first == NULL) {
     return; 
   }
 
@@ -472,7 +452,7 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
       
       switch (*(me->read_buf)) {
         case '<':
-        {          
+        {
           p = me->read_buf + 1;
           i = strtol(p, &endp, 10);
           
@@ -487,8 +467,32 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
               
               if (p == endp) { break; }
               
-              if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL) ) {                
-                ((QDevice*)dev_tbl[i])->CmdDivider(me->read_buf);
+              uint8_t op = i & 0xC0;
+              i = i & 0x3F;
+
+              if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL)) {
+                
+                switch (op) {
+                  case ENQUEUE:
+                  {
+                    ((QDevice*)dev_tbl[i])->EnqueueCmd(me->read_buf);
+                    break;
+                  }
+                  case DEQUEUE:
+                  {
+                    ((QDevice*)dev_tbl[i])->DequeueCmd();
+                    break;
+                  }
+                  case FLUSH:
+                  {
+                    ((QDevice*)dev_tbl[i])->FlushQueue();
+                  }
+                  default:
+                  {
+                    ((QDevice*)dev_tbl[i])->CmdDivider(me->read_buf);
+                    break;
+                  }
+                }
               }
             }
           }

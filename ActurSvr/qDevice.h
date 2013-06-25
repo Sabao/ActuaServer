@@ -50,12 +50,10 @@ enum InternalSignals {
   SI_DEQUE_SIG
 };
 
-//command
-#define INTERRUPT    128
-#define FLUSH_QUEUE  64
-
-//devID
-#define NO_ARRAY     64
+//command-option
+#define ENQUEUE  64
+#define DEQUEUE  128
+#define FLUSH    192
 
 #define WAVE_DRIVE   0x11
 #define HALF_STEP    0X07
