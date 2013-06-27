@@ -50,7 +50,7 @@ uint8_t l_TIMER2_COMPA;
 #endif
 
 // Serial Interface  -------------------------------------------------------------
-extern SerialInterface* p_si;
+extern SI* p_si;
 // ISRs ----------------------------------------------------------------------
 ISR(TIMER2_COMPA_vect) {
     // No need to clear the interrupt source since the Timer2 compare

@@ -36,7 +36,7 @@ Q_DEFINE_THIS_FILE
 //............................................................................
 
 extern QActive* dev_tbl[];
-extern SerialInterface* p_si;
+extern SI* p_si;
 
 QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 : 
@@ -253,7 +253,7 @@ void QDevice::send_cmd(const char*s, uint8_t oid, char c) {
 }
 
 //............................................................................
-SerialInterface::SerialInterface(uint8_t id)
+SI::SI(uint8_t id)
 : QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
 m_keep_alive_timer(SI_CHK_ALIVE_SIG)
 {
@@ -266,7 +266,7 @@ m_keep_alive_timer(SI_CHK_ALIVE_SIG)
   c = '\n';
 }
 
-void SerialInterface::SI_prefix(char* s, uint8_t ch, int8_t id) {
+void SI::SI_prefix(char* s, uint8_t ch, int8_t id) {
   
     char temp[4] = {'\0'};
     uint8_t proc_id = PROC_id;
@@ -283,7 +283,7 @@ void SerialInterface::SI_prefix(char* s, uint8_t ch, int8_t id) {
     
 }
 
-bool SerialInterface::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t val2){
+bool SI::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t val2){
   
   if(!(stat_flg & EMGCY)) {
     
@@ -307,7 +307,7 @@ bool SerialInterface::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t
   }  
 }
 
-bool SerialInterface::send_to_serial(int8_t ch, int8_t id, int16_t val1, char val2){
+bool SI::send_to_serial(int8_t ch, int8_t id, int16_t val1, char val2){
   
   if(!(stat_flg & EMGCY)) {
     
@@ -332,7 +332,7 @@ bool SerialInterface::send_to_serial(int8_t ch, int8_t id, int16_t val1, char va
   }  
 }
 
-bool SerialInterface::send_to_serial(int8_t ch, int8_t id, char val1, int16_t val2){
+bool SI::send_to_serial(int8_t ch, int8_t id, char val1, int16_t val2){
   
   if(!(stat_flg & EMGCY)) {
     
@@ -356,7 +356,7 @@ bool SerialInterface::send_to_serial(int8_t ch, int8_t id, char val1, int16_t va
   }  
 }
 
-bool SerialInterface::send_to_serial(int8_t ch, int8_t id, char val1, char val2){
+bool SI::send_to_serial(int8_t ch, int8_t id, char val1, char val2){
   
   if(!(stat_flg & EMGCY)) {
     
@@ -381,7 +381,7 @@ bool SerialInterface::send_to_serial(int8_t ch, int8_t id, char val1, char val2)
   }  
 }
 
-void SerialInterface::On_ISR() {
+void SI::On_ISR() {
   if (stat_flg & EMGCY) {
     if (Serial.available() > 0) {
       c = Serial.read();
@@ -430,13 +430,13 @@ void SerialInterface::On_ISR() {
   }
 }
 
-QState SerialInterface::initial(SerialInterface *me, QEvent const *e) {
+QState SI::initial(SI *me, QEvent const *e) {
   me->m_keep_alive_timer.postIn(me, 250);
   me->subscribe(SI_EMGCY_SIG);
-  return Q_TRAN(&SerialInterface::Exchange);
+  return Q_TRAN(&SI::Exchange);
 }
 
-QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
+QState SI::Exchange(SI *me, QEvent const *e) {
   switch (e->sig) {
     case Q_ENTRY_SIG:
     {
@@ -576,7 +576,7 @@ QState SerialInterface::Exchange(SerialInterface *me, QEvent const *e) {
   return Q_SUPER(&QHsm::top);
 }
 
-void SerialInterface::CmdExecutor(SerialInterface* me, CmdInfo* p) {
+void SI::CmdExecutor(SI* me, CmdInfo* p) {
      if(*(p->buffcpy) == '(') {
        if(me->stat_flg & CHKECHO) {
          me->EnqueueCmd(p->buffcpy);

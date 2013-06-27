@@ -116,10 +116,10 @@ class QDevice : public QP::QActive {
 
 //............................................................................
 
-class SerialInterface : public QDevice {
+class SI : public QDevice {
 
   public:
-    SerialInterface(uint8_t);
+    SI(uint8_t);
     void On_ISR();
     
     bool IsEmgcy()    { return stat_flg & EMGCY; };
@@ -139,10 +139,10 @@ class SerialInterface : public QDevice {
 
     void SI_prefix(char*, uint8_t, int8_t);
     
-  static void CmdExecutor(SerialInterface*, CmdInfo*);
+  static void CmdExecutor(SI*, CmdInfo*);
 
-  static QP::QState initial (SerialInterface *me, QP::QEvent const *e);
-  static QP::QState Exchange (SerialInterface *me, QP::QEvent const *e);
+  static QP::QState initial (SI *me, QP::QEvent const *e);
+  static QP::QState Exchange (SI *me, QP::QEvent const *e);
 };
 
 //............................................................................
