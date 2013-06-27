@@ -80,6 +80,7 @@ struct CmdQueue {
 
 class QDevice : public QP::QActive {
   public:
+    static QActive* dev_tbl[];
     typedef  void (*QDcmdHandler)(QDevice*, CmdInfo*);
     bool rsv();
 

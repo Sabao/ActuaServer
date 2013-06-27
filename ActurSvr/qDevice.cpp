@@ -44,9 +44,7 @@ QActive(h),
 devID(id), clbkfunc(p) {
   first = NULL; 
   last  = NULL;
-#ifdef TOTAL_OF_DEV
   dev_tbl[ id & 0x3F ] = this;
-#endif
 }
 
 uint8_t QDevice::getID() {
