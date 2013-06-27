@@ -99,15 +99,15 @@ bool QDevice::CmdDivider(const char* cmd) {
 
 bool QDevice::EnqueueCmd(const char *cmd) {
 
-  void* new_que;
-  if(new_que = malloc(sizeof(CmdList))) {
+  void* new_list;
+  if(new_list = malloc(sizeof(CmdList))) {
 
     if(last == NULL) {
-      last = (CmdList*)new_que;
+      last = (CmdList*)new_list;
       first = last;
     }
     else {
-      last->next = (CmdList*)new_que;
+      last->next = (CmdList*)new_list;
       last = last->next;
     }
 
@@ -142,23 +142,46 @@ bool QDevice::DequeueCmd() {
   return false;        
 };
 
+char* QDevice::EmptyList() {
+
+  void* new_list;
+  if(new_list = malloc(sizeof(CmdList))) {
+
+    if(last == NULL) {
+      last = (CmdList*)new_list;
+      first = last;
+    }
+    else {
+      last->next = (CmdList*)new_list;
+      last = last->next;
+    }
+
+    last->next = NULL;    
+
+    return ((CmdList*)new_list)->cmdString;
+  } else {
+    FlushQueue();
+    return (char*)NULL;
+  } 
+};
+
 void QDevice::FlushQueue() {
 
   if(first == NULL) {
     return; 
   }
 
-  CmdList* flush_que = first;
-  CmdList* nextflush_que = NULL;
+  CmdList* flush_list = first;
+  CmdList* nextflush_list = NULL;
 
   do {
 
-    nextflush_que = flush_que->next;
-    free(flush_que);
-    flush_que = nextflush_que;
+    nextflush_list = flush_list->next;
+    free(flush_list);
+    flush_list = nextflush_list;
 
   } 
-  while(flush_que != NULL);
+  while(flush_list != NULL);
 
 }
 
