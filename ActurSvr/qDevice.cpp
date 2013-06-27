@@ -100,14 +100,14 @@ bool QDevice::CmdDivider(const char* cmd) {
 bool QDevice::EnqueueCmd(const char *cmd) {
 
   void* new_que;
-  if(new_que = malloc(sizeof(CmdQueue))) {
+  if(new_que = malloc(sizeof(CmdList))) {
 
     if(last == NULL) {
-      last = (CmdQueue*)new_que;
+      last = (CmdList*)new_que;
       first = last;
     }
     else {
-      last->next = (CmdQueue*)new_que;
+      last->next = (CmdList*)new_que;
       last = last->next;
     }
 
@@ -124,7 +124,7 @@ bool QDevice::DequeueCmd() {
 
   if(first != NULL) {
 
-    CmdQueue* temp = first;
+    CmdList* temp = first;
 
     first = NULL;
     CmdDivider(temp->cmdString);
@@ -148,8 +148,8 @@ void QDevice::FlushQueue() {
     return; 
   }
 
-  CmdQueue* flush_que = first;
-  CmdQueue* nextflush_que = NULL;
+  CmdList* flush_que = first;
+  CmdList* nextflush_que = NULL;
 
   do {
 

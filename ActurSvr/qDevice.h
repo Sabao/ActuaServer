@@ -71,8 +71,8 @@ struct CmdInfo {
   int16_t        cmdValue[2];
 };
 
-struct CmdQueue {
-  CmdQueue* next;
+struct CmdList {
+  CmdList* next;
   char cmdString[cmdSIZE];
 };
 
@@ -89,8 +89,8 @@ class QDevice : public QP::QActive {
     const    uint8_t devID;
     void     send_cmd(const char*, uint8_t, char);
     
-    CmdQueue*  first;
-    CmdQueue*  last;
+    CmdList*  first;
+    CmdList*  last;
 
   public:
     QDevice(
@@ -101,11 +101,12 @@ class QDevice : public QP::QActive {
 
   uint8_t getID();
   
-  bool CmdDivider(const char*);
+  bool  CmdDivider(const char*);
   
-  bool EnqueueCmd(const char*);
-  bool DequeueCmd();
-  void FlushQueue();
+  bool  EnqueueCmd(const char*);
+  bool  DequeueCmd();
+  char* EmptyList();
+  void  FlushQueue();
   
   void InternalCmd(uint8_t, int16_t, int16_t, char);
   void InternalCmd(uint8_t, int16_t, char ,char);
