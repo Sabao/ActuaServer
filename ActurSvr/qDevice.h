@@ -117,10 +117,10 @@ class QDevice : public QP::QActive {
 
 //............................................................................
 
-class SI : public QDevice {
+class CmdPump : public QDevice {
 
   public:
-    SI(uint8_t);
+    CmdPump(uint8_t);
     void On_ISR();
     
     bool IsEmgcy()    { return stat_flg & EMGCY; };
@@ -138,12 +138,12 @@ class SI : public QDevice {
     char* rp;
     char  c;
 
-    void SI_prefix(char*, uint8_t, int8_t);
+    void CmdPump_prefix(char*, uint8_t, int8_t);
     
-  static void CmdExecutor(SI*, CmdInfo*);
+  static void CmdExecutor(CmdPump*, CmdInfo*);
 
-  static QP::QState initial (SI *me, QP::QEvent const *e);
-  static QP::QState Exchange (SI *me, QP::QEvent const *e);
+  static QP::QState initial (CmdPump *me, QP::QEvent const *e);
+  static QP::QState Exchange (CmdPump *me, QP::QEvent const *e);
 };
 
 //............................................................................

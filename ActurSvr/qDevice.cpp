@@ -36,7 +36,7 @@ Q_DEFINE_THIS_FILE
 //............................................................................
 
 extern QActive* dev_tbl[];
-extern SI* p_si;
+extern CmdPump* p_si;
 
 QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 : 
@@ -276,7 +276,7 @@ void QDevice::send_cmd(const char*s, uint8_t oid, char c) {
 }
 
 //............................................................................
-SI::SI(uint8_t id)
+CmdPump::CmdPump(uint8_t id)
 : QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
 m_keep_alive_timer(SI_CHK_ALIVE_SIG)
 {
@@ -289,7 +289,7 @@ m_keep_alive_timer(SI_CHK_ALIVE_SIG)
   c = '\n';
 }
 
-void SI::SI_prefix(char* s, uint8_t ch, int8_t id) {
+void CmdPump::CmdPump_prefix(char* s, uint8_t ch, int8_t id) {
   
     char temp[4] = {'\0'};
     uint8_t proc_id = PROC_id;
@@ -306,14 +306,14 @@ void SI::SI_prefix(char* s, uint8_t ch, int8_t id) {
     
 }
 
-bool SI::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t val2){
+bool CmdPump::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t val2){
   
   if(!(stat_flg & EMGCY)) {
     
     char temp[6] = {'\0'};
     char str[cmdSIZE] = {'\0'};
     
-    SI_prefix(str, ch, id);
+    CmdPump_prefix(str, ch, id);
     
     strcat(str, itoa(val1, temp, 10));
     strcat(str, ",");
@@ -330,14 +330,14 @@ bool SI::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t val2){
   }  
 }
 
-bool SI::send_to_serial(int8_t ch, int8_t id, int16_t val1, char val2){
+bool CmdPump::send_to_serial(int8_t ch, int8_t id, int16_t val1, char val2){
   
   if(!(stat_flg & EMGCY)) {
     
     char temp[6] = {'\0'};
     char str[cmdSIZE] = {'\0'};
     
-    SI_prefix(str, ch, id);
+    CmdPump_prefix(str, ch, id);
     
     strcat(str, itoa(val1, temp, 10));
     strcat(str, ",");
@@ -355,14 +355,14 @@ bool SI::send_to_serial(int8_t ch, int8_t id, int16_t val1, char val2){
   }  
 }
 
-bool SI::send_to_serial(int8_t ch, int8_t id, char val1, int16_t val2){
+bool CmdPump::send_to_serial(int8_t ch, int8_t id, char val1, int16_t val2){
   
   if(!(stat_flg & EMGCY)) {
     
     char temp[6] = {'\0'};
     char str[cmdSIZE] = {'\0'};
     
-    SI_prefix(str, ch, id);
+    CmdPump_prefix(str, ch, id);
     
     temp[0] = val1;
     strcat(str, temp);
@@ -379,14 +379,14 @@ bool SI::send_to_serial(int8_t ch, int8_t id, char val1, int16_t val2){
   }  
 }
 
-bool SI::send_to_serial(int8_t ch, int8_t id, char val1, char val2){
+bool CmdPump::send_to_serial(int8_t ch, int8_t id, char val1, char val2){
   
   if(!(stat_flg & EMGCY)) {
     
     char temp[2] = {'\0'};
     char str[cmdSIZE] = {'\0'};
     
-    SI_prefix(str, ch, id);
+    CmdPump_prefix(str, ch, id);
     
     temp[0] = val1;
     strcat(str, temp);
@@ -404,7 +404,7 @@ bool SI::send_to_serial(int8_t ch, int8_t id, char val1, char val2){
   }  
 }
 
-void SI::On_ISR() {
+void CmdPump::On_ISR() {
   if (stat_flg & EMGCY) {
     if (Serial.available() > 0) {
       c = Serial.read();
@@ -453,13 +453,13 @@ void SI::On_ISR() {
   }
 }
 
-QState SI::initial(SI *me, QEvent const *e) {
+QState CmdPump::initial(CmdPump *me, QEvent const *e) {
   me->m_keep_alive_timer.postIn(me, 250);
   me->subscribe(SI_EMGCY_SIG);
-  return Q_TRAN(&SI::Exchange);
+  return Q_TRAN(&CmdPump::Exchange);
 }
 
-QState SI::Exchange(SI *me, QEvent const *e) {
+QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
   switch (e->sig) {
     case Q_ENTRY_SIG:
     {
@@ -599,7 +599,7 @@ QState SI::Exchange(SI *me, QEvent const *e) {
   return Q_SUPER(&QHsm::top);
 }
 
-void SI::CmdExecutor(SI* me, CmdInfo* p) {
+void CmdPump::CmdExecutor(CmdPump* me, CmdInfo* p) {
      if(*(p->buffcpy) == '(') {
        if(me->stat_flg & CHKECHO) {
          me->EnqueueCmd(p->buffcpy);
