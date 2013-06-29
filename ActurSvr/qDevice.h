@@ -103,9 +103,8 @@ class QDevice : public QP::QActive {
   
   bool  CmdDivider(const char*);
   
-  bool  EnqueueCmd(const char*);
+  char* EnqueueCmd(const char*);
   bool  DequeueCmd();
-  char* EmptyList();
   void  FlushQueue();
   
   void InternalCmd(uint8_t, int16_t, int16_t, char);

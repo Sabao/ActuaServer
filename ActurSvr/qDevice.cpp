@@ -97,7 +97,7 @@ bool QDevice::CmdDivider(const char* cmd) {
   return true;
 };
 
-bool QDevice::EnqueueCmd(const char *cmd) {
+char* QDevice::EnqueueCmd(const char *cmd) {
 
   void* new_list;
   if(new_list = malloc(sizeof(CmdList))) {
@@ -111,12 +111,17 @@ bool QDevice::EnqueueCmd(const char *cmd) {
       last = last->next;
     }
 
-    last->next = NULL;    
-    strcpy(last->cmdString, cmd);
-    return true;
+    last->next = NULL;
+    
+    if (cmd != NULL) {
+      strcpy(last->cmdString, cmd);
+    }
+    
+    return ((CmdList*)new_list)->cmdString;
+    
   } else {
     FlushQueue();
-    return false;
+    return NULL;
   } 
 };
 
@@ -140,29 +145,6 @@ bool QDevice::DequeueCmd() {
     return true;
   }
   return false;        
-};
-
-char* QDevice::EmptyList() {
-
-  void* new_list;
-  if(new_list = malloc(sizeof(CmdList))) {
-
-    if(last == NULL) {
-      last = (CmdList*)new_list;
-      first = last;
-    }
-    else {
-      last->next = (CmdList*)new_list;
-      last = last->next;
-    }
-
-    last->next = NULL;    
-
-    return ((CmdList*)new_list)->cmdString;
-  } else {
-    FlushQueue();
-    return (char*)NULL;
-  } 
 };
 
 void QDevice::FlushQueue() {
@@ -432,16 +414,15 @@ void CmdPump::On_ISR() {
             stat_flg |= SHUT;
             QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
             this->POST(pe, this);
-            rp = read_buf;
             break;
           }
           default:
           {
             memset(read_buf, 0, sizeof(read_buf));
-            rp = read_buf;
             break;
           }
         }
+        rp = read_buf;
       }
     } else if (c == '\n') {
       if (rsv()) {
