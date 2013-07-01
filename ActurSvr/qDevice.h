@@ -133,7 +133,6 @@ class CmdPump : public QDevice {
     volatile uint8_t   stat_flg;
     
     CmdList* lstp;
-    char* head;
     char* rp;
     char  c;
 

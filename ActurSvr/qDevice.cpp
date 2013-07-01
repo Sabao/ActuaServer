@@ -276,8 +276,7 @@ m_keep_alive_timer(SI_CHK_ALIVE_SIG)
   stat_flg |= ALIVE;
 
   lstp  = (CmdList*)malloc(sizeof(CmdList));
-  head  = lstp->cmdString;
-  rp    = head;
+  rp  = lstp->cmdString;
   c = '\0';
 }
 
@@ -413,16 +412,15 @@ void CmdPump::On_ISR() {
 
       *rp++ = c;
       
-      if (c == '\n' || (rp - head > cmdSIZE - 2)) {
-        switch (*head) {
+      if (c == '\n' || (rp - lstp->cmdString > cmdSIZE - 2)) {
+        switch (*(lstp->cmdString)) {
           case '<':
           case '(':
           {
             *rp = '\0';
             EnqueueList(lstp);
             lstp  = (CmdList*)malloc(sizeof(CmdList));
-            head  = lstp->cmdString;
-            rp    = head;
+            rp    = lstp->cmdString;
             QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
             this->POST(pe, this);
             break;
@@ -435,7 +433,7 @@ void CmdPump::On_ISR() {
           }
           default:
           {
-            rp    = head;
+            rp    = lstp->cmdString;
             break;
           }
         }
@@ -492,7 +490,7 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
       me->stat_flg  = 0x00;
       me->stat_flg |= STAY;
       me->stat_flg |= ALIVE;
-      me->rp = me->head;
+      me->rp        = me->lstp->cmdString;
       me->c = '\0';
       QEvent* pe = Q_NEW(QEvent, SI_CHK_ALIVE_SIG);
       me->POST(pe, me);    
