@@ -46,8 +46,7 @@ enum InternalSignals {
   FREQ_SIG,
   SI_END_LINE_SIG,
   SI_CHK_ALIVE_SIG,
-  SI_RETURN_SIG,
-  SI_DEQUE_SIG
+  SI_RETURN_SIG
 };
 
 //command-option
@@ -62,7 +61,6 @@ enum InternalSignals {
 #define STAY         0x01
 #define ALIVE        0x02
 #define CHKECHO      0x04
-#define SHUT         0x08
 #define EMGCY        0x80
 
 struct CmdInfo {
@@ -82,7 +80,6 @@ class QDevice : public QP::QActive {
   public:
     static QActive* dev_tbl[];
     typedef  void (*QDcmdHandler)(QDevice*, CmdInfo*);
-    bool rsv();
 
   private:
     const    QDcmdHandler clbkfunc;
@@ -91,6 +88,7 @@ class QDevice : public QP::QActive {
     
     CmdList*  first;
     CmdList*  last;
+    uint8_t   List_cnt;   
 
   public:
     QDevice(
@@ -100,12 +98,14 @@ class QDevice : public QP::QActive {
     );
 
   uint8_t getID();
+  uint8_t ListCount();
   
-  bool  CmdDivider(const char*);
-  
+  bool  CmdDivider(const char*);  
+
   char* EnqueueCmd(const char*);
   bool  DequeueCmd();
   void  FlushQueue();
+  void  EnqueueList(CmdList*);
   
   void InternalCmd(uint8_t, int16_t, int16_t, char);
   void InternalCmd(uint8_t, int16_t, char ,char);
@@ -131,9 +131,9 @@ class CmdPump : public QDevice {
   private:
     QP::QTimeEvt m_keep_alive_timer;
     volatile uint8_t   stat_flg;
-
-    char  read_buf[cmdSIZE];
-    char  check_buf[cmdSIZE];
+    
+    CmdList* lstp;
+    char* head;
     char* rp;
     char  c;
 

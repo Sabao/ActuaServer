@@ -42,8 +42,9 @@ QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 : 
 QActive(h),
 devID(id), clbkfunc(p) {
-  first = NULL; 
-  last  = NULL;
+  first     = NULL; 
+  last      = NULL;
+  List_cnt  = 0;
   dev_tbl[ id & 0x3F ] = this;
 }
 
@@ -51,12 +52,8 @@ uint8_t QDevice::getID() {
   return devID & 0x3F;
 }
 
-bool QDevice::rsv() {
-  if (first != NULL) {
-    return true;
-  } else {
-    return false;
-  }
+uint8_t QDevice::ListCount() {
+  return List_cnt;
 }
 
 bool QDevice::CmdDivider(const char* cmd) {
@@ -71,7 +68,7 @@ bool QDevice::CmdDivider(const char* cmd) {
   } else {
     ch = strtok(++p,",");
   }
-    
+  
   strcpy(cmdinfo.buffcpy, p);
   uint8_t i;
   
@@ -85,11 +82,6 @@ bool QDevice::CmdDivider(const char* cmd) {
     
   if(i > 2) { return false; }    
 
-  
-  if (this != p_si && (*cmd == '@')) {
-    p_si->EnqueueCmd(cmd);
-  }
-  
   strcpy(cmdinfo.buffcpy, cmd);
 
   (*clbkfunc)(this, &cmdinfo); 
@@ -117,12 +109,28 @@ char* QDevice::EnqueueCmd(const char *cmd) {
       strcpy(last->cmdString, cmd);
     }
     
+    ++List_cnt;
     return ((CmdList*)new_list)->cmdString;
     
   } else {
     FlushQueue();
     return NULL;
   } 
+};
+
+void QDevice::EnqueueList(CmdList* lp) {
+
+    if(last == NULL) {
+      last  = lp;
+      first = last;
+    }
+    else {
+      last->next = lp;
+      last = last->next;
+    }
+
+    last->next = NULL;
+    ++List_cnt;
 };
 
 bool QDevice::DequeueCmd() {
@@ -140,7 +148,8 @@ bool QDevice::DequeueCmd() {
     else {
       last = NULL;
     }
-
+    
+    --List_cnt;
     free(temp);
     return true;
   }
@@ -164,7 +173,7 @@ void QDevice::FlushQueue() {
 
   } 
   while(flush_list != NULL);
-
+  List_cnt = 0;
 }
 
 void QDevice::InternalCmd(uint8_t id, int16_t val1, int16_t val2, char c = '<') {
@@ -265,10 +274,11 @@ m_keep_alive_timer(SI_CHK_ALIVE_SIG)
   stat_flg = 0x00;
   stat_flg |= STAY;
   stat_flg |= ALIVE;
-  memset(read_buf, 0, sizeof(read_buf));
-  memset(check_buf, 0, sizeof(check_buf));
-  rp = read_buf;
-  c = '\n';
+
+  lstp  = (CmdList*)malloc(sizeof(CmdList));
+  head  = lstp->cmdString;
+  rp    = head;
+  c = '\0';
 }
 
 void CmdPump::CmdPump_prefix(char* s, uint8_t ch, int8_t id) {
@@ -397,39 +407,42 @@ void CmdPump::On_ISR() {
     }
   } else {
     if (Serial.available() > 0) {
-      if (stat_flg & SHUT) { return; }
       
       c = Serial.read();
       if(c == '\0') { return; }
-      
-      Serial.print(c);
+
       *rp++ = c;
       
-      if (c == '\n' || (rp - read_buf) > cmdSIZE - 2) {
-        switch (*read_buf) {
+      if (c == '\n' || (rp - head > cmdSIZE - 2)) {
+        switch (*head) {
           case '<':
-          case ')':
-          case '~':
-          {    
-            stat_flg |= SHUT;
+          case '(':
+          {
+            *rp = '\0';
+            EnqueueList(lstp);
+            lstp  = (CmdList*)malloc(sizeof(CmdList));
+            head  = lstp->cmdString;
+            rp    = head;
             QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
             this->POST(pe, this);
             break;
           }
+          case '~':
+          {
+            stat_flg &= ~STAY;
+            stat_flg |= ALIVE;
+            break;
+          }
           default:
           {
-            memset(read_buf, 0, sizeof(read_buf));
+            rp    = head;
             break;
           }
         }
-        rp = read_buf;
       }
-    } else if (c == '\n') {
-      if (rsv()) {
-        stat_flg |= SHUT;
-        QEvent* pe = Q_NEW(QEvent, SI_DEQUE_SIG);
-        this->POST(pe, this); 
-      }
+    } else if (ListCount()) {
+        QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
+        this->POST(pe, this);      
     }
   }
 }
@@ -448,90 +461,7 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
     }
     case SI_END_LINE_SIG:
     {
-      char*    p;
-      char*    endp;
-      uint8_t  i;
-      
-      switch (*(me->read_buf)) {
-        case '<':
-        {
-          p = me->read_buf + 1;
-          i = strtol(p, &endp, 10);
-          
-          if (p == endp) { break; }
-          
-          if (i == PROC_id) {
-            p = strchr(me->read_buf, '|');
-            
-            if (p != NULL) {
-              p++;
-              i = strtol(p, &endp, 10);
-              
-              if (p == endp) { break; }
-              
-              uint8_t op = i & 0xC0;
-              i = i & 0x3F;
-
-              if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL)) {
-                
-                switch (op) {
-                  case ENQUEUE:
-                  {
-                    ((QDevice*)dev_tbl[i])->EnqueueCmd(me->read_buf);
-                    break;
-                  }
-                  case DEQUEUE:
-                  {
-                    ((QDevice*)dev_tbl[i])->DequeueCmd();
-                    break;
-                  }
-                  case FLUSH:
-                  {
-                    ((QDevice*)dev_tbl[i])->FlushQueue();
-                  }
-                  default:
-                  {
-                    ((QDevice*)dev_tbl[i])->CmdDivider(me->read_buf);
-                    break;
-                  }
-                }
-              }
-            }
-          }
-          break;
-        }
-        case ')':
-        {
-          p = me->read_buf + 1;
-          i = strtol(p, &endp, 10);
-          
-          if (p == endp) {
-              me->stat_flg |= EMGCY;
-              me->stat_flg &= ~STAY;
-              me->stat_flg &= ~ALIVE;
-              break;
-            }
-          
-          if (i == PROC_id) {
-            if ((strcmp(p , (me->check_buf + 1)) != 0)) {
-              me->stat_flg |= EMGCY;
-              me->stat_flg &= ~STAY;
-              me->stat_flg &= ~ALIVE;
-            } else {
-              me->stat_flg &= ~CHKECHO;
-            }
-          }
-          break;
-        }
-        case '~':
-        {
-          me->stat_flg &= ~STAY;
-          me->stat_flg |= ALIVE;
-          break;
-        }
-      }
-      memset(me->read_buf, 0, sizeof(me->read_buf));
-      me->stat_flg &= ~SHUT;
+      me->DequeueCmd();      
       return Q_HANDLED();
     }
     case SI_CHK_ALIVE_SIG:
@@ -562,35 +492,60 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
       me->stat_flg  = 0x00;
       me->stat_flg |= STAY;
       me->stat_flg |= ALIVE;
-      memset(me->read_buf, 0, sizeof(me->read_buf));
-      memset(me->check_buf, 0, sizeof(me->check_buf));
-      me->rp = me->read_buf;
+      me->rp = me->head;
       me->c = '\0';
       QEvent* pe = Q_NEW(QEvent, SI_CHK_ALIVE_SIG);
       me->POST(pe, me);    
-      return Q_HANDLED();
-    }
-    case SI_DEQUE_SIG:
-    {
-      me->DequeueCmd();
-      me->stat_flg &= ~SHUT;
       return Q_HANDLED();
     }
   }
   return Q_SUPER(&QHsm::top);
 }
 
-void CmdPump::CmdExecutor(CmdPump* me, CmdInfo* p) {
-     if(*(p->buffcpy) == '(') {
-       if(me->stat_flg & CHKECHO) {
-         me->EnqueueCmd(p->buffcpy);
-         return;
-       } else {
-         me->stat_flg |= CHKECHO;         
-         strcpy(me->check_buf, p->buffcpy);
-       }
-     }
-     Serial.print(p->buffcpy);
+void CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
+  
+  char*    p;
+  char*    endp;
+  uint8_t  i;
+  
+  p = data->buffcpy + 1;
+  i = strtol(p, &endp, 10);
+  
+  if (p == endp) { return; }
+  
+  uint8_t op = i & 0xC0;
+  i = i & 0x3F;
+  
+  if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL)) {
+    Serial.print(data->buffcpy);
+    
+    if (i == me->getID()) {
+
+    } else {
+      switch (op) {
+        
+        case ENQUEUE:
+        {
+          ((QDevice*)dev_tbl[i])->EnqueueCmd(data->buffcpy);
+          break;
+        }
+        case DEQUEUE:
+        {
+          ((QDevice*)dev_tbl[i])->DequeueCmd();
+          break;
+        }
+        case FLUSH:
+        {
+          ((QDevice*)dev_tbl[i])->FlushQueue();
+        }
+        default:
+        {
+          ((QDevice*)dev_tbl[i])->CmdDivider(data->buffcpy);
+          break;
+        }
+      }
+    }
+  }
 }
 //............................................................................
 
