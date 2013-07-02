@@ -84,9 +84,11 @@ bool QDevice::CmdDivider(const char* cmd) {
 
   strcpy(cmdinfo.buffcpy, cmd);
 
-  (*clbkfunc)(this, &cmdinfo); 
-
-  return true;
+  if ((*clbkfunc)(this, &cmdinfo)) {
+   return true;
+  } else {
+    return true;
+  }
 };
 
 char* QDevice::EnqueueCmd(const char *cmd) {
@@ -136,11 +138,13 @@ void QDevice::EnqueueList(CmdList* lp) {
 bool QDevice::DequeueCmd() {
 
   if(first != NULL) {
-
+    
+    bool ans = false;
+    
     CmdList* temp = first;
 
     first = NULL;
-    CmdDivider(temp->cmdString);
+    ans = CmdDivider(temp->cmdString);
 
     if(temp->next != NULL) {
       first = temp->next;
@@ -151,7 +155,7 @@ bool QDevice::DequeueCmd() {
     
     --List_cnt;
     free(temp);
-    return true;
+    return ans;
   }
   return false;        
 };
@@ -500,22 +504,23 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
   return Q_SUPER(&QHsm::top);
 }
 
-void CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
+bool CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
   
   char*    p;
   char*    endp;
-  uint8_t  i;
+  uint8_t  i;  
   
   p = data->buffcpy + 1;
   i = strtol(p, &endp, 10);
   
-  if (p == endp) { return; }
+  if (p == endp) { return false; }
   
   uint8_t op = i & 0xC0;
   i = i & 0x3F;
   
   if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL)) {
-    Serial.print(data->buffcpy);
+    
+    bool ans = false;
     
     if (i == me->getID()) {
 
@@ -524,25 +529,34 @@ void CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
         
         case ENQUEUE:
         {
-          ((QDevice*)dev_tbl[i])->EnqueueCmd(data->buffcpy);
+          ans = ((QDevice*)dev_tbl[i])->EnqueueCmd(data->buffcpy);
           break;
         }
         case DEQUEUE:
         {
-          ((QDevice*)dev_tbl[i])->DequeueCmd();
+          ans = ((QDevice*)dev_tbl[i])->DequeueCmd();
           break;
         }
         case FLUSH:
         {
           ((QDevice*)dev_tbl[i])->FlushQueue();
+          ans = true;
         }
         default:
         {
-          ((QDevice*)dev_tbl[i])->CmdDivider(data->buffcpy);
+          ans = ((QDevice*)dev_tbl[i])->CmdDivider(data->buffcpy);
           break;
         }
       }
     }
+    if (ans) {
+      *(data->buffcpy) = '!';
+    } else {
+      *(data->buffcpy) = '?';
+    }
+    Serial.print(data->buffcpy);
+    
+    return ans;
   }
 }
 //............................................................................
@@ -607,12 +621,15 @@ QState LEDgroup::blinkBackward(LEDgroup *me, QEvent const *e) {
   return Q_SUPER(&QHsm::top);
 }
 
-void LEDgroup::CmdExecutor(LEDgroup* me, CmdInfo* p) {
+bool LEDgroup::CmdExecutor(LEDgroup* me, CmdInfo* p) {
 
   //Write your class-depended code under here.
   if(p->cmdValue[0] != 0) {    
     me->itrvl = p->cmdValue[0];
-  }  
+    return true;
+  } else {
+    return false;
+  }
 }
 
 //............................................................................

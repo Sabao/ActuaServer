@@ -79,7 +79,7 @@ struct CmdList {
 class QDevice : public QP::QActive {
   public:
     static QActive* dev_tbl[];
-    typedef  void (*QDcmdHandler)(QDevice*, CmdInfo*);
+    typedef  bool (*QDcmdHandler)(QDevice*, CmdInfo*);
 
   private:
     const    QDcmdHandler clbkfunc;
@@ -138,7 +138,7 @@ class CmdPump : public QDevice {
 
     void CmdPump_prefix(char*, uint8_t, int8_t);
     
-  static void CmdExecutor(CmdPump*, CmdInfo*);
+  static bool CmdExecutor(CmdPump*, CmdInfo*);
 
   static QP::QState initial (CmdPump *me, QP::QEvent const *e);
   static QP::QState Exchange (CmdPump *me, QP::QEvent const *e);
@@ -165,7 +165,7 @@ class LEDgroup : public QDevice {
     uint8_t cur_pin;
     uint16_t itrvl;
 
-  static void CmdExecutor(LEDgroup*, CmdInfo*);
+  static bool CmdExecutor(LEDgroup*, CmdInfo*);
 
   static QP::QState initial (LEDgroup *me, QP::QEvent const *e);
   static QP::QState blinkForward(LEDgroup *me, QP::QEvent const *e);
