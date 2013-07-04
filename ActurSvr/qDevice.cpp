@@ -91,6 +91,10 @@ bool QDevice::CmdDivider(const char* cmd) {
   }
 };
 
+bool  QDevice::CmdExecutor(QDevice* Me, CmdInfo* Infop) {
+  return (*clbkfunc)(Me, Infop);
+};
+
 char* QDevice::EnqueueCmd(const char *cmd) {
 
   void* new_list;
@@ -544,19 +548,22 @@ bool CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
         }
         default:
         {
-          ans = ((QDevice*)dev_tbl[i])->CmdDivider(data->buffcpy);
+          ans = ((QDevice*)dev_tbl[i])->CmdExecutor((QDevice*)dev_tbl[i], data);
           break;
         }
       }
     }
     if (ans) {
-      *(data->buffcpy) = '!';
+      *(data->buffcpy) = '*';
     } else {
       *(data->buffcpy) = '?';
     }
     Serial.print(data->buffcpy);
     
     return ans;
+  } else {
+    Serial.println("[No obj]");
+    return false;
   }
 }
 //............................................................................

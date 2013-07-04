@@ -98,10 +98,11 @@ class QDevice : public QP::QActive {
     );
 
   uint8_t getID();
-  uint8_t ListCount();
+  uint8_t ListCount();  
   
-  bool  CmdDivider(const char*);  
-
+  bool  CmdDivider(const char*);
+  bool  CmdExecutor(QDevice*, CmdInfo*);
+  
   char* EnqueueCmd(const char*);
   bool  DequeueCmd();
   void  FlushQueue();
