@@ -36,7 +36,11 @@ Q_DEFINE_THIS_FILE
 //............................................................................
 
 extern QActive* dev_tbl[];
-extern CmdPump* p_si;
+extern CmdPump* p_cp;
+
+extern unsigned long start_time;
+extern unsigned long passed_time;
+extern unsigned long max_time;
 
 QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 : 
@@ -56,75 +60,44 @@ uint8_t QDevice::ListCount() {
   return List_cnt;
 }
 
-bool QDevice::CmdDivider(const char* cmd) {
+bool QDevice::CmdDivider(Cmd_Data* dist, char* src) { 
   
-  CmdInfo cmdinfo = {0};
+  char* p = strchr(src, ',');  
+  if (p == NULL) { return false; }
   
-  char* ch;
-  char* p = strchr(cmd, ',');
-    
-  if (p == NULL) {
-    return false;
-  } else {
-    ch = strtok(++p,",");
-  }
+  char* ch         = NULL;
+  char* saveptr    = NULL;
+  char* endp       = NULL;
   
-  strcpy(cmdinfo.buffcpy, p);
   uint8_t i;
+  
+  ch = strtok_r(++p, ",\n", &saveptr);  
   
   for(i = 0; ch != NULL ; i++) {
     if(i < 2) {
-      strncpy(&cmdinfo.cmdLetter[i], ch, 1);
-      cmdinfo.cmdValue[i] = strtol(ch, NULL, 10);
-    }
-    ch = strtok(NULL,",");
+      
+      strncpy(dist->Str[i], ch, 5);
+      dist->Param = strtol(dist->Str[i], &endp, 10);
+      if (dist->Str[i] != endp) {
+        //dist->context += i + 1;
+      }
+      
+    }    
+    ch = strtok_r(NULL, ",\n", &saveptr);
   }
-    
-  if(i > 2) { return false; }    
-
-  strcpy(cmdinfo.buffcpy, cmd);
-
-  if ((*clbkfunc)(this, &cmdinfo)) {
-   return true;
-  } else {
-    return true;
-  }
+  
+  //if(i == 1) { dist->context += 128; }
+  dist->context = QD_I;
+  if(i > 2) { return false; }
+  
+  return true;
 };
 
-bool  QDevice::CmdExecutor(QDevice* Me, CmdInfo* Infop) {
-  return (*clbkfunc)(Me, Infop);
+bool  QDevice::CmdExecutor(QDevice* Me, Data_Block* dbp) {
+  return (*clbkfunc)(Me, dbp);
 };
 
-char* QDevice::EnqueueCmd(const char *cmd) {
-
-  void* new_list;
-  if(new_list = malloc(sizeof(CmdList))) {
-
-    if(last == NULL) {
-      last = (CmdList*)new_list;
-      first = last;
-    }
-    else {
-      last->next = (CmdList*)new_list;
-      last = last->next;
-    }
-
-    last->next = NULL;
-    
-    if (cmd != NULL) {
-      strcpy(last->cmdString, cmd);
-    }
-    
-    ++List_cnt;
-    return ((CmdList*)new_list)->cmdString;
-    
-  } else {
-    FlushQueue();
-    return NULL;
-  } 
-};
-
-void QDevice::EnqueueList(CmdList* lp) {
+void QDevice::EnqueueList(Data_List* lp) {
 
     if(last == NULL) {
       last  = lp;
@@ -145,10 +118,11 @@ bool QDevice::DequeueCmd() {
     
     bool ans = false;
     
-    CmdList* temp = first;
+    Data_List* temp = first;
 
     first = NULL;
-    ans = CmdDivider(temp->cmdString);
+    
+    ans = (*clbkfunc)(this, &(temp->d_blk));
 
     if(temp->next != NULL) {
       first = temp->next;
@@ -170,8 +144,8 @@ void QDevice::FlushQueue() {
     return; 
   }
 
-  CmdList* flush_list = first;
-  CmdList* nextflush_list = NULL;
+  Data_List* flush_list = first;
+  Data_List* nextflush_list = NULL;
 
   do {
 
@@ -183,7 +157,7 @@ void QDevice::FlushQueue() {
   while(flush_list != NULL);
   List_cnt = 0;
 }
-
+/*
 void QDevice::InternalCmd(uint8_t id, int16_t val1, int16_t val2, char c = '<') {
   
   char temp[6] = {'\0'};
@@ -273,7 +247,7 @@ void QDevice::send_cmd(const char*s, uint8_t oid, char c) {
     }
   }
 }
-
+*/
 //............................................................................
 CmdPump::CmdPump(uint8_t id)
 : QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
@@ -283,8 +257,8 @@ m_keep_alive_timer(SI_CHK_ALIVE_SIG)
   stat_flg |= STAY;
   stat_flg |= ALIVE;
 
-  lstp  = (CmdList*)malloc(sizeof(CmdList));
-  rp  = lstp->cmdString;
+  lstp  = (Data_List*)malloc(sizeof(Data_List));
+  rp  = lstp->d_blk.origin_str;
   c = '\0';
 }
 
@@ -304,7 +278,7 @@ void CmdPump::CmdPump_prefix(char* s, uint8_t ch, int8_t id) {
     strcat(s, ",");
     
 }
-
+/*
 bool CmdPump::send_to_serial(int8_t ch, int8_t id, int16_t val1, int16_t val2){
   
   if(!(stat_flg & EMGCY)) {
@@ -402,7 +376,7 @@ bool CmdPump::send_to_serial(int8_t ch, int8_t id, char val1, char val2){
     return false;
   }  
 }
-
+*/
 void CmdPump::On_ISR() {
   if (stat_flg & EMGCY) {
     if (Serial.available() > 0) {
@@ -416,19 +390,22 @@ void CmdPump::On_ISR() {
     if (Serial.available() > 0) {
       
       c = Serial.read();
-      if(c == '\0') { return; }
 
-      *rp++ = c;
+      if(c == '\0') { return; }
       
-      if (c == '\n' || (rp - lstp->cmdString > cmdSIZE - 2)) {
-        switch (*(lstp->cmdString)) {
+      *rp = c;
+      
+       ++rp;
+       
+      if (c == '\n' || ((rp - (lstp->d_blk.origin_str)) > (cmdSIZE - 2))) {
+        switch (*(lstp->d_blk.origin_str)) {
           case '<':
           case '(':
           {
             *rp = '\0';
             EnqueueList(lstp);
-            lstp  = (CmdList*)malloc(sizeof(CmdList));
-            rp    = lstp->cmdString;
+            lstp  = (Data_List*)malloc(sizeof(Data_List));
+            rp    = lstp->d_blk.origin_str;
             QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
             this->POST(pe, this);
             break;
@@ -441,7 +418,7 @@ void CmdPump::On_ISR() {
           }
           default:
           {
-            rp    = lstp->cmdString;
+            rp    = lstp->d_blk.origin_str;
             break;
           }
         }
@@ -488,7 +465,6 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
     }
     case SI_EMGCY_SIG:
     {
-      me->InternalCmd(1, 25, 0);
       return Q_HANDLED();
     }
     case SI_RETURN_SIG:
@@ -498,7 +474,7 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
       me->stat_flg  = 0x00;
       me->stat_flg |= STAY;
       me->stat_flg |= ALIVE;
-      me->rp        = me->lstp->cmdString;
+      me->rp        = me->lstp->d_blk.origin_str;
       me->c = '\0';
       QEvent* pe = Q_NEW(QEvent, SI_CHK_ALIVE_SIG);
       me->POST(pe, me);    
@@ -508,19 +484,26 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
   return Q_SUPER(&QHsm::top);
 }
 
-bool CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
+bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {  
   
-  char*    p;
-  char*    endp;
+  char*       p;
+  char*       endp;
+  Data_List*  pList;
   uint8_t  i;  
   
-  p = data->buffcpy + 1;
+  p = dblk->origin_str + 1;
   i = strtol(p, &endp, 10);
   
   if (p == endp) { return false; }
   
   uint8_t op = i & 0xC0;
   i = i & 0x3F;
+
+  Data_Block newblk;
+  
+  if (me->CmdDivider(&(newblk.cmd_d), p) == false) {
+    return false;
+  }
   
   if( (i <= TOTAL_OF_DEV) && (dev_tbl[i] != NULL)) {
     
@@ -532,8 +515,14 @@ bool CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
       switch (op) {
         
         case ENQUEUE:
-        {
-          ans = ((QDevice*)dev_tbl[i])->EnqueueCmd(data->buffcpy);
+        {  
+          if (pList = (Data_List*)malloc(sizeof(Data_List))) {
+            pList->d_blk.cmd_d = newblk.cmd_d;
+          } else {
+            return false;
+          }
+          ((QDevice*)dev_tbl[i])->EnqueueList(pList);
+          ans = true;
           break;
         }
         case DEQUEUE:
@@ -547,22 +536,14 @@ bool CmdPump::CmdExecutor(CmdPump* me, CmdInfo* data) {
           ans = true;
         }
         default:
-        {
-          ans = ((QDevice*)dev_tbl[i])->CmdExecutor((QDevice*)dev_tbl[i], data);
+        {          
+          ans = ((QDevice*)dev_tbl[i])->CmdExecutor((QDevice*)dev_tbl[i], &newblk);          
           break;
         }
       }
-    }
-    if (ans) {
-      *(data->buffcpy) = '*';
-    } else {
-      *(data->buffcpy) = '?';
-    }
-    Serial.print(data->buffcpy);
-    
+    }   
     return ans;
   } else {
-    Serial.println("[No obj]");
     return false;
   }
 }
@@ -628,15 +609,15 @@ QState LEDgroup::blinkBackward(LEDgroup *me, QEvent const *e) {
   return Q_SUPER(&QHsm::top);
 }
 
-bool LEDgroup::CmdExecutor(LEDgroup* me, CmdInfo* p) {
+bool LEDgroup::CmdExecutor(LEDgroup* me, Data_Block* p) {
 
-  //Write your class-depended code under here.
-  if(p->cmdValue[0] != 0) {    
-    me->itrvl = p->cmdValue[0];
-    return true;
-  } else {
-    return false;
-  }
+  if (p->cmd_d.context == QD_I) {
+    if(p->cmd_d.Param > 0) {
+      me->itrvl = p->cmd_d.Param;
+      return true;
+    }
+  }  
+  return false;
 }
 
 //............................................................................

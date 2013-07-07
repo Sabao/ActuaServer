@@ -49,10 +49,14 @@ Q_DEFINE_THIS_FILE
 uint8_t l_TIMER2_COMPA;
 #endif
 
-// Serial Interface  -------------------------------------------------------------
-extern CmdPump* p_si;
+// Command-Pump  -------------------------------------------------------------
+extern CmdPump* p_cp;
+unsigned long start_time    = 0;
+unsigned long passed_time   = 0;
+unsigned long max_time      = 0;
 // ISRs ----------------------------------------------------------------------
 ISR(TIMER2_COMPA_vect) {
+    //start_time = micros();
     // No need to clear the interrupt source since the Timer2 compare
     // interrupt is automatically cleard in hardware when the ISR runs.
 
@@ -60,9 +64,15 @@ ISR(TIMER2_COMPA_vect) {
 
     QF::TICK(&l_TIMER2_COMPA);                // process all armed time events
     
-    p_si->On_ISR();
-    
+    p_cp->On_ISR();    
+
     QK_ISR_EXIT();                    // inform QK kernel about exiting an ISR
+    /*
+    passed_time = micros() - start_time;    
+    if (max_time < passed_time) {
+      max_time = passed_time;
+    }
+    */
 }
 
 //............................................................................

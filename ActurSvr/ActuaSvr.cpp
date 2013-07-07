@@ -32,11 +32,11 @@ Q_DEFINE_THIS_FILE
   Count number of devices, and MODIFY macro 'TOTAL_OF_DEV' definition in qDevice.h.
 */
 
-static CmdPump l_si(0); //CmdPump objects(Do not delete!)
+static CmdPump l_cp(0); //CmdPump objects(Do not delete!)
 static LEDgroup ledgroup(1,9,11);
 
 //Pointer that this application depends ---------------------------------------
-CmdPump* p_si = &l_si; //(Do not delete!)
+CmdPump* p_cp = &l_cp; //(Do not delete!)
 //ServoTact* p_tact = &;
 
 //////////////////////////////////////////////////////////////////////////////
