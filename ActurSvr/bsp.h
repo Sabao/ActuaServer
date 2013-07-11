@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////////////////////////
-//This file was created by modifying the file, 
+//This file was created by modifying the file,
 //qp/examples/qp/qp_dpp_qk/bsp.h received from Quantum Leaps, LLC.
 //Sabao Akutsu. Mar. 27, 2013
-// 
+//
 //Product : ActuaServer (On Arduino, Real-time control some cheap actuators)
 //
 //Copyright (C) 2002-2012 Quantum Leaps, LLC. All rights reserved.
@@ -27,8 +27,8 @@
 
 #include <avr/io.h>                                                 // AVR I/O
 
-                                                 // Sys timer tick per seconds
-#define BSP_TICKS_PER_SEC    5000
+// Sys timer tick per seconds
+#define BSP_TICKS_PER_SEC    1000
 
 void BSP_init(void);
 

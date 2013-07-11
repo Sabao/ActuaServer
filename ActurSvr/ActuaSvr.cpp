@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////////////////////////
-//This file was created by modifying the file, 
+//This file was created by modifying the file,
 //qp/examples/qp/qp_dpp_qk/philo.cpp received from Quantum Leaps, LLC.
 //Sabao Akutsu. Mar. 27, 2013
-// 
+//
 //Product : ActuaServer (On Arduino, Real-time control some cheap actuators)
 //
 //Copyright (C) 2002-2012 Quantum Leaps, LLC. All rights reserved.
@@ -28,9 +28,9 @@ Q_DEFINE_THIS_FILE
 
 //QDevice objects -------------------------------------------------------------
 /*
-  Add all devices here.
-  Count number of devices, and MODIFY macro 'TOTAL_OF_DEV' definition in qDevice.h.
-*/
+   Add all devices here.
+   Count number of devices, and MODIFY macro 'TOTAL_OF_DEV' definition in qDevice.h.
+ */
 
 static CmdPump l_cp(0); //CmdPump objects(Do not delete!)
 static LEDgroup ledgroup(1,9,11);

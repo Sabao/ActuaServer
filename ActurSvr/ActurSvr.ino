@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////////////////////////
-//This file was created by modifying the file, 
+//This file was created by modifying the file,
 //qp/examples/qp/qp_dpp_qk/qp_dpp_qk.ino received from Quantum Leaps, LLC.
 //Sabao Akutsu. Mar. 27, 2013
-// 
+//
 //Product : ActuaServer (On Arduino, Real-time control some cheap actuators)
 //
 //Copyright (C) 2002-2012 Quantum Leaps, LLC. All rights reserved.
@@ -33,29 +33,29 @@ QActive* QDevice::dev_tbl[TOTAL_OF_DEV] = {NULL};
 
 // Local-scope objects -------------------------------------------------------
 static union SmallEvents {
-  void      *e0;
-  uint8_t   e1[sizeof(QEvent)];
+	void      *e0;
+	uint8_t e1[sizeof(QEvent)];
 } l_smlPoolSto[TOTAL_OF_DEV];
 
 static QEvent const *l_DeviceQueueSto[TOTAL_OF_DEV][1];
-static QSubscrList   l_subscrSto[MAX_PUB_SIG];
+static QSubscrList l_subscrSto[MAX_PUB_SIG];
 
 //............................................................................
 
 void setup() {
-  BSP_init();                                          // initialize the BSP
-  QF::init();       // initialize the framework and the underlying RT kernel
+	BSP_init();                                    // initialize the BSP
+	QF::init(); // initialize the framework and the underlying RT kernel
 
-  QF::poolInit(l_smlPoolSto, sizeof(l_smlPoolSto), sizeof(l_smlPoolSto[0]));
-  QF::psInit(l_subscrSto, Q_DIM(l_subscrSto));     // init publish-subscribe
+	QF::poolInit(l_smlPoolSto, sizeof(l_smlPoolSto), sizeof(l_smlPoolSto[0]));
+	QF::psInit(l_subscrSto, Q_DIM(l_subscrSto)); // init publish-subscribe
 
-  for (uint8_t n = 0U; n < TOTAL_OF_DEV; ++n) {
-    if(QDevice::dev_tbl[n] != NULL) {
-      QDevice::dev_tbl[n]->start((uint8_t)(n + 1U),
-      l_DeviceQueueSto[n], Q_DIM(l_DeviceQueueSto[n]),
-      (void *)0, 0U);
-    }
-  }
+	for (uint8_t n = 0U; n < TOTAL_OF_DEV; ++n) {
+		if(QDevice::dev_tbl[n] != NULL) {
+			QDevice::dev_tbl[n]->start((uint8_t)(n + 1U),
+			                           l_DeviceQueueSto[n], Q_DIM(l_DeviceQueueSto[n]),
+			                           (void *)0, 0U);
+		}
+	}
 }
 
 //////////////////////////////////////////////////////////////////////////////

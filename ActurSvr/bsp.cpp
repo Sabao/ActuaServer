@@ -1,8 +1,8 @@
 //////////////////////////////////////////////////////////////////////////////
-//This file was created by modifying the file, 
+//This file was created by modifying the file,
 //qp/examples/qp/qp_dpp_qk/bsp.cpp received from Quantum Leaps, LLC.
 //Sabao Akutsu. Mar. 27, 2013
-// 
+//
 //Product : ActuaServer (On Arduino, Real-time control some cheap actuators)
 //
 //Copyright (C) 2002-2012 Quantum Leaps, LLC. All rights reserved.
@@ -53,77 +53,78 @@ uint8_t l_TIMER2_COMPA;
 extern CmdPump* p_cp;
 unsigned long start_time    = 0;
 unsigned long passed_time   = 0;
-unsigned long max_time      = 0;
+uint16_t max_time      = 0;
 // ISRs ----------------------------------------------------------------------
 ISR(TIMER2_COMPA_vect) {
-    //start_time = micros();
-    // No need to clear the interrupt source since the Timer2 compare
-    // interrupt is automatically cleard in hardware when the ISR runs.
+	START();
+	// No need to clear the interrupt source since the Timer2 compare
+	// interrupt is automatically cleard in hardware when the ISR runs.
 
-    QK_ISR_ENTRY();                  // inform QK kernel about entering an ISR
+	QK_ISR_ENTRY();              // inform QK kernel about entering an ISR
 
-    QF::TICK(&l_TIMER2_COMPA);                // process all armed time events
-    
-    p_cp->On_ISR();    
+	QF::TICK(&l_TIMER2_COMPA);            // process all armed time events
 
-    QK_ISR_EXIT();                    // inform QK kernel about exiting an ISR
-    /*
-    passed_time = micros() - start_time;    
-    if (max_time < passed_time) {
-      max_time = passed_time;
-    }
-    */
+	p_cp->On_ISR();
+
+	QK_ISR_EXIT();                // inform QK kernel about exiting an ISR
+
+
 }
 
 //............................................................................
 void BSP_init(void) {
-    DDRB  = 0xFF;                     // All PORTB pins are outputs (user LED)
-    PORTB = 0x00;                                        // drive all pins low    
-    
-    //Serial.begin(115200, SERIAL_8E1);
-    Serial.begin(115200);
-    
-    if (QS_INIT((void *)0) == 0) {       // initialize the QS software tracing
-        Q_ERROR();
-    }
-    
-    QS_OBJ_DICTIONARY(&l_SysTick_Handler);
+	DDRB  = 0xFF;                 // All PORTB pins are outputs (user LED)
+	PORTB = 0x00;                                    // drive all pins low
+
+	//Serial.begin(115200, SERIAL_8E1);
+	Serial.begin(115200);
+
+	if (QS_INIT((void *)0) == 0) {   // initialize the QS software tracing
+		Q_ERROR();
+	}
+
+	QS_OBJ_DICTIONARY(&l_SysTick_Handler);
 }
 //............................................................................
 void QF::onStartup(void) {
-          // set Timer2 in CTC mode, 1/1024 prescaler, start the timer ticking
-    TCCR2A = ((1 << WGM21) | (0 << WGM20));
-    TCCR2B = (( 1 << CS22 ) | ( 1 << CS21 ) | ( 1 << CS20 ));        // 1/2^10
-    ASSR &= ~(1<<AS2);
-    TIMSK2 = (1 << OCIE2A);                 // Enable TIMER2 compare Interrupt
-    TCNT2 = 0;
-    OCR2A = TICK_DIVIDER;     // must be loaded last for Atmega168 and friends
+	// set Timer2 in CTC mode, 1/1024 prescaler, start the timer ticking
+	TCCR2A = ((1 << WGM21) | (0 << WGM20));
+	TCCR2B = (( 1 << CS22 ) | ( 1 << CS21 ) | ( 1 << CS20 ));    // 1/2^10
+	ASSR &= ~(1<<AS2);
+	TIMSK2 = (1 << OCIE2A);             // Enable TIMER2 compare Interrupt
+	TCNT2 = 0;
+	OCR2A = TICK_DIVIDER; // must be loaded last for Atmega168 and friends
 }
 //............................................................................
 void QF::onCleanup(void) {
 }
 //............................................................................
 void QK::onIdle() {
+	if (max_time < passed_time) {
+		max_time = passed_time;
+		Serial.print(max_time);
+		Serial.write("us\n");
+	}
 
-    QF_INT_DISABLE();
-    USER_LED_ON();     // toggle the User LED on Arduino on and off, see NOTE1
-    USER_LED_OFF();
-    QF_INT_ENABLE();
+	QF_INT_DISABLE();
+	USER_LED_ON(); // toggle the User LED on Arduino on and off, see NOTE1
+	USER_LED_OFF();
+	QF_INT_ENABLE();
 
 #ifdef SAVE_POWER
 
-    SMCR = (0 << SM0) | (1 << SE);  // idle sleep mode, adjust to your project
-    __asm__ __volatile__ ("sleep" "\n\t" :: );
-    SMCR = 0;                                              // clear the SE bit
+	SMCR = (0 << SM0) | (1 << SE); // idle sleep mode, adjust to your project
+	__asm__ __volatile__ ("sleep" "\n\t" :: );
+	SMCR = 0;                                          // clear the SE bit
 
 #endif
 }
 
 //............................................................................
 void Q_onAssert(char const Q_ROM * const Q_ROM_VAR file, int line) {
-    QF_INT_DISABLE();                                // disable all interrupts
-    USER_LED_ON();                                  // User LED permanently ON
-    asm volatile ("jmp 0x0000");    // perform a software reset of the Arduino
+	QF_INT_DISABLE();                            // disable all interrupts
+	USER_LED_ON();                              // User LED permanently ON
+	asm volatile ("jmp 0x0000"); // perform a software reset of the Arduino
 }
 
 //////////////////////////////////////////////////////////////////////////////

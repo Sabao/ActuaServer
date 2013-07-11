@@ -1,7 +1,7 @@
 //////////////////////////////////////////////////////////////////////////////
 //This file is newly created and added by me.
 //Sabao Akutsu. Mar. 27, 2013
-// 
+//
 //Product : ActuaServer (On Arduino, Real-time control some cheap actuators)
 //
 //Copyright (C) 2002-2012 Quantum Leaps, LLC. All rights reserved.
@@ -32,21 +32,21 @@
 #define TOTAL_OF_DEV   2
 #define cmdSIZE       17
 
-enum qdSignals { 
-   SI_EMGCY_SIG = QP::Q_USER_SIG,
-   MAX_PUB_SIG,
-   MAX_SIG
+enum qdSignals {
+	SI_EMGCY_SIG = QP::Q_USER_SIG,
+	MAX_PUB_SIG,
+	MAX_SIG
 };
 
 enum InternalSignals {
-  TIMEOUT_SIG = MAX_SIG,
-  HIGH_SIG,
-  LOW_SIG,
-  DONE_SIG,
-  FREQ_SIG,
-  SI_END_LINE_SIG,
-  SI_CHK_ALIVE_SIG,
-  SI_RETURN_SIG
+	TIMEOUT_SIG = MAX_SIG,
+	HIGH_SIG,
+	LOW_SIG,
+	DONE_SIG,
+	FREQ_SIG,
+	SI_END_LINE_SIG,
+	SI_CHK_ALIVE_SIG,
+	SI_RETURN_SIG
 };
 
 //command-option
@@ -54,12 +54,9 @@ enum InternalSignals {
 #define DEQUEUE  128
 #define FLUSH    192
 
-#define QD_C    128
-#define QD_I    129
-#define QD_CC   0
-#define QD_IC   1
-#define QD_CI   2
-#define QD_II   3
+#define ONE_TOK  0
+#define TWO_TOK  2
+#define USE_NUM  3
 
 #define WAVE_DRIVE   0x11
 #define HALF_STEP    0X07
@@ -70,118 +67,111 @@ enum InternalSignals {
 #define CHKECHO      0x04
 #define EMGCY        0x80
 
+#define START() start_time = micros()
+#define STOP() passed_time = micros() - start_time
+#define SEND_CMD(id, dblk)  (((QDevice*)dev_tbl[(id)])->clbkfunc((QDevice*)dev_tbl[(id)], (dblk)))
+
 struct Cmd_Data {
-  uint8_t        context;
-  char           Str[2][6];
-  int16_t        Param;
+	uint8_t context;
+	char tok[2][6];
+	int16_t num;
 };
 
 union Data_Block {
-  char           origin_str[cmdSIZE];
-  Cmd_Data       cmd_d;
+	char origin_str[cmdSIZE];
+	Cmd_Data cmd_d;
 };
 
 struct Data_List {
-  Data_List*     next;
-  Data_Block     d_blk;
+	Data_List*     next;
+	Data_Block d_blk;
 };
 
 //............................................................................
 
 class QDevice : public QP::QActive {
-  public:
-    static QActive* dev_tbl[];
-    typedef  bool (*QDcmdHandler)(QDevice*, Data_Block*);
+public:
+static QActive* dev_tbl[];
+typedef     bool (*QDcmdHandler)(QDevice*, Data_Block*);
 
-  private:
-    const    QDcmdHandler clbkfunc;
-    const    uint8_t devID;
-    void     send_cmd(const char*, uint8_t, char);
-    
-    Data_List*  first;
-    Data_List*  last;
-    uint8_t     List_cnt;   
+private:
+const uint8_t devID;
+void send_cmd(const char*, uint8_t, char);
 
-  public:
-    QDevice(
-      uint8_t,
-      QDcmdHandler,
-      QP::QStateHandler
-    );
+Data_List*  first;
+Data_List*  last;
+uint8_t List_cnt;
 
-  uint8_t getID();
-  uint8_t ListCount();  
-  
-  bool  CmdDivider(Cmd_Data*, char*);
-  bool  CmdExecutor(QDevice*, Data_Block*);
-  
-  bool  DequeueCmd();
-  void  FlushQueue();
-  void  EnqueueList(Data_List*);
-  
-  void InternalCmd(uint8_t, int16_t, int16_t, char);
-  void InternalCmd(uint8_t, int16_t, char ,char);
-  void InternalCmd(uint8_t, char, int16_t, char);
-  void InternalCmd(uint8_t, char, char, char);
+public:
 
+const QDcmdHandler clbkfunc;
+
+QDevice(
+        uint8_t,
+        QDcmdHandler,
+        QP::QStateHandler
+        );
+
+uint8_t    getID();
+uint8_t    ListCount();
+void       EnqueueList(Data_List*);
+bool       DequeueCmd();
+void       FlushQueue();
+
+static void       CmdBuilder(char*, Cmd_Data*);
 };
 
 //............................................................................
 
 class CmdPump : public QDevice {
 
-  public:
-    CmdPump(uint8_t);
-    void On_ISR();
-    
-    bool IsEmgcy()    { return stat_flg & EMGCY; };
-    bool send_to_serial(int8_t, int8_t, int16_t, int16_t);
-    bool send_to_serial(int8_t, int8_t, int16_t, char);
-    bool send_to_serial(int8_t, int8_t, char, int16_t);
-    bool send_to_serial(int8_t, int8_t, char, char);
-    
-  private:
-    QP::QTimeEvt m_keep_alive_timer;
-    volatile uint8_t   stat_flg;
-    
-    Data_List* lstp;
-    char* rp;
-    char  c;
+public:
+CmdPump(uint8_t);
+void       On_ISR();
 
-    void CmdPump_prefix(char*, uint8_t, int8_t);
-    
-  static bool CmdExecutor(CmdPump*, Data_Block*);
+bool       IsEmgcy()    {
+	return stat_flg & EMGCY;
+};
 
-  static QP::QState initial (CmdPump *me, QP::QEvent const *e);
-  static QP::QState Exchange (CmdPump *me, QP::QEvent const *e);
+private:
+QP::QTimeEvt m_keep_alive_timer;
+volatile uint8_t stat_flg;
+
+Data_List* lstp;
+char* rp;
+char c;
+
+static bool CmdExecutor(CmdPump*, Data_Block*);
+static QP::QState initial (CmdPump *me, QP::QEvent const *e);
+static QP::QState Exchange (CmdPump *me, QP::QEvent const *e);
 };
 
 //............................................................................
 
 class LEDgroup : public QDevice {
-  private:
-    QP::QTimeEvt m_timeEvt;
+private:
+QP::QTimeEvt m_timeEvt;
 
-  public:
-    LEDgroup(
-      uint8_t,
-      uint8_t,
-      uint8_t,
-      uint16_t itr = 1000
-    );
+public:
+LEDgroup(
+        uint8_t,
+        uint8_t,
+        uint8_t,
+        uint16_t itr = 1000
+        );
 
-  private:
-    const uint8_t s_pin;
-    const uint8_t e_pin;
+private:
+const uint8_t s_pin;
+const uint8_t e_pin;
 
-    uint8_t cur_pin;
-    uint16_t itrvl;
+uint8_t cur_pin;
+uint16_t itrvl;
 
-  static bool CmdExecutor(LEDgroup*, Data_Block*);
+static bool CmdExecutor(LEDgroup*, Data_Block*);
 
-  static QP::QState initial (LEDgroup *me, QP::QEvent const *e);
-  static QP::QState blinkForward(LEDgroup *me, QP::QEvent const *e);
-  static QP::QState blinkBackward(LEDgroup *me, QP::QEvent const *e);
+static QP::QState initial (LEDgroup *me, QP::QEvent const *e);
+static QP::QState blinkForward(LEDgroup *me, QP::QEvent const *e);
+static QP::QState blinkBackward(LEDgroup *me, QP::QEvent const *e);
 };
 
 //............................................................................
