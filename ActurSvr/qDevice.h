@@ -26,11 +26,13 @@
 
 #include "qp_port.h"
 #include <stdlib.h>
-#include <Servo.h>
+
+using namespace QP;
 
 #define PROC_id        0
 #define TOTAL_OF_DEV   2
 #define cmdSIZE       17
+#define stoSIZE      30
 
 enum qdSignals {
 	SI_EMGCY_SIG = QP::Q_USER_SIG,
@@ -70,6 +72,8 @@ enum InternalSignals {
 #define START() start_time = micros()
 #define STOP() passed_time = micros() - start_time
 #define SEND_CMD(id, dblk)  (((QDevice*)dev_tbl[(id)])->clbkfunc((QDevice*)dev_tbl[(id)], (dblk)))
+#define GET_DL() (Data_List*)m_sto.m_pool.get()
+#define PUT_DL(p) m_sto.m_pool.put((p))
 
 struct Cmd_Data {
 	uint8_t context;
@@ -87,23 +91,28 @@ struct Data_List {
 	Data_Block d_blk;
 };
 
+class DL_Storage {
+public:
+QMPool m_pool;
+DL_Storage();
+private:
+Data_List dListSto[stoSIZE];
+};
 //............................................................................
-
 class QDevice : public QP::QActive {
 public:
 static QActive* dev_tbl[];
+static DL_Storage m_sto;
 typedef     bool (*QDcmdHandler)(QDevice*, Data_Block*);
 
 private:
 const uint8_t devID;
-void send_cmd(const char*, uint8_t, char);
 
 Data_List*  first;
 Data_List*  last;
 uint8_t List_cnt;
 
 public:
-
 const QDcmdHandler clbkfunc;
 
 QDevice(
@@ -117,10 +126,7 @@ uint8_t    ListCount();
 void       EnqueueList(Data_List*);
 bool       DequeueCmd();
 void       FlushQueue();
-
-static void       CmdBuilder(char*, Cmd_Data*);
 };
-
 //............................................................................
 
 class CmdPump : public QDevice {
@@ -173,7 +179,6 @@ static QP::QState initial (LEDgroup *me, QP::QEvent const *e);
 static QP::QState blinkForward(LEDgroup *me, QP::QEvent const *e);
 static QP::QState blinkBackward(LEDgroup *me, QP::QEvent const *e);
 };
-
 //............................................................................
 
 #endif

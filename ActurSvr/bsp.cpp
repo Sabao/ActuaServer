@@ -68,7 +68,7 @@ ISR(TIMER2_COMPA_vect) {
 
 	QK_ISR_EXIT();                // inform QK kernel about exiting an ISR
 
-
+	STOP();
 }
 
 //............................................................................

@@ -30,17 +30,16 @@
 using namespace QP;
 
 Q_DEFINE_THIS_FILE
-
 //............................................................................
-
-//............................................................................
-
 extern QActive* dev_tbl[];
-extern CmdPump* p_cp;
 
 extern unsigned long start_time;
 extern unsigned long passed_time;
 extern uint16_t max_time;
+
+DL_Storage::DL_Storage() {
+	m_pool.init(dListSto, sizeof(dListSto), sizeof(dListSto[0]));
+}
 
 QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 	:
@@ -81,20 +80,20 @@ bool QDevice::DequeueCmd() {
 
 		bool ans = false;
 
-		Data_List temp = *first;
-		free(first);
+		Data_List *temp = first;
 
 		first = NULL;
 
-		ans = (*clbkfunc)(this, &(temp.d_blk));
+		ans = (*clbkfunc)(this, &(temp->d_blk));
 
-		if(temp.next != NULL) {
-			first = temp.next;
+		if(temp->next != NULL) {
+			first = temp->next;
 		}
 		else {
 			last = NULL;
 		}
 
+		PUT_DL(temp);
 		--List_cnt;
 
 		return ans;
@@ -114,13 +113,14 @@ void QDevice::FlushQueue() {
 	do {
 
 		nextflush_list = flush_list->next;
-		free(flush_list);
+		PUT_DL(flush_list);
 		flush_list = nextflush_list;
 
 	}
 	while(flush_list != NULL);
 	List_cnt = 0;
 }
+
 //............................................................................
 CmdPump::CmdPump(uint8_t id)
 	: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
@@ -130,7 +130,7 @@ CmdPump::CmdPump(uint8_t id)
 	stat_flg |= STAY;
 	stat_flg |= ALIVE;
 
-	lstp  = (Data_List*)malloc(sizeof(Data_List));
+	lstp  = GET_DL();
 	rp  = lstp->d_blk.origin_str;
 	c = '\0';
 }
@@ -160,7 +160,8 @@ void CmdPump::On_ISR() {
 				{
 					*rp = '\0';
 					EnqueueList(lstp);
-					lstp  = (Data_List*)malloc(sizeof(Data_List));
+					//lstp  = (Data_List*)malloc(sizeof(Data_List));
+					lstp  = GET_DL();
 					rp    = lstp->d_blk.origin_str;
 					QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
 					this->POST(pe, this);
@@ -241,7 +242,6 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
 }
 
 bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {
-	STOP();
 	char *tp = dblk->origin_str + 1;
 	char *endp;
 	uint8_t id = strtol(tp, &endp, 10);
@@ -291,7 +291,7 @@ bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {
 			case ENQUEUE:
 			{
 				Data_List*  pList;
-				if (pList = (Data_List*)malloc(sizeof(Data_List))) {
+				if (pList = GET_DL()) {
 					pList->d_blk.cmd_d = newblk.cmd_d;
 				} else {
 					return false;

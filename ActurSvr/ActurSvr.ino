@@ -25,13 +25,13 @@
 #include "qp_port.h"
 #include "bsp.h"
 #include "qDevice.h"
-#include <Servo.h>
 
 using namespace QP;
 
 QActive* QDevice::dev_tbl[TOTAL_OF_DEV] = {NULL};
-
+DL_Storage QDevice::m_sto;
 // Local-scope objects -------------------------------------------------------
+
 static union SmallEvents {
 	void      *e0;
 	uint8_t e1[sizeof(QEvent)];
@@ -39,7 +39,6 @@ static union SmallEvents {
 
 static QEvent const *l_DeviceQueueSto[TOTAL_OF_DEV][1];
 static QSubscrList l_subscrSto[MAX_PUB_SIG];
-
 //............................................................................
 
 void setup() {
