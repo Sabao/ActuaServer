@@ -32,7 +32,7 @@ using namespace QP;
 #define PROC_id        0
 #define TOTAL_OF_DEV   2
 #define cmdSIZE       17
-#define stoSIZE      30
+#define stoSIZE       30
 
 enum qdSignals {
 	SI_EMGCY_SIG = QP::Q_USER_SIG,
@@ -72,8 +72,11 @@ enum InternalSignals {
 #define START() start_time = micros()
 #define STOP() passed_time = micros() - start_time
 #define SEND_CMD(id, dblk)  (((QDevice*)dev_tbl[(id)])->clbkfunc((QDevice*)dev_tbl[(id)], (dblk)))
-#define GET_DL() (Data_List*)m_sto.m_pool.get()
-#define PUT_DL(p) m_sto.m_pool.put((p))
+#define FORCE_FLUSH(id) (((QDevice*)dev_tbl[(id)])->FlushQueue())
+#define DEQ_CMD(id) (((QDevice*)dev_tbl[(id)])->DequeueCmd())
+#define ENQ_CMD(id, p) (((QDevice*)dev_tbl[(id)])->EnqueueList((p)))
+#define GET_DL() ((Data_List*)m_sto.m_pool.get())
+#define PUT_DL(p) (m_sto.m_pool.put((p)))
 
 struct Cmd_Data {
 	uint8_t context;

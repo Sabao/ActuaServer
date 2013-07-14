@@ -296,18 +296,18 @@ bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {
 				} else {
 					return false;
 				}
-				((QDevice*)dev_tbl[id])->EnqueueList(pList);
+				ENQ_CMD(id, pList);
 				ans = true;
 				break;
 			}
 			case DEQUEUE:
 			{
-				ans = ((QDevice*)dev_tbl[id])->DequeueCmd();
+				ans = DEQ_CMD(id);
 				break;
 			}
 			case FLUSH:
 			{
-				((QDevice*)dev_tbl[id])->FlushQueue();
+				FORCE_FLUSH(id);
 				ans = true;
 			}
 			default:
