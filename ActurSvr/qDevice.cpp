@@ -242,7 +242,21 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
 }
 
 bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {
-	char *tp = dblk->origin_str + 1;
+	char *tp = dblk->origin_str;
+
+	if (me->stat_flg & CHKSUM) {
+		uint8_t out[4] = { '>', '\0', '\0', '\n' };
+
+		while(*tp != '\0') {
+			*((uint16_t*)(out + 1)) += *tp;
+			++tp;
+		}
+
+		Serial.write(out, 4);
+	}
+	STOP();
+
+	tp = dblk->origin_str + 1;
 	char *endp;
 	uint8_t id = strtol(tp, &endp, 10);
 
@@ -284,6 +298,16 @@ bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {
 		bool ans = false;
 
 		if (id == me->getID()) {
+			if (newblk.cmd_d.context == ONE_TOK) {
+				if(!strcmp(newblk.cmd_d.tok[0], "cksum")) {
+					me->stat_flg |= CHKSUM;
+					return true;
+				} else if(!strcmp(newblk.cmd_d.tok[0], "nosum")) {
+					me->stat_flg &= ~CHKSUM;
+					return true;
+				}
+			}
+			return false;
 
 		} else {
 			switch (op) {

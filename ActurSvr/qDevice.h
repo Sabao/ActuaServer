@@ -67,6 +67,7 @@ enum InternalSignals {
 #define STAY         0x01
 #define ALIVE        0x02
 #define CHKECHO      0x04
+#define CHKSUM       0x08
 #define EMGCY        0x80
 
 #define START() start_time = micros()
