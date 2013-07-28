@@ -29,9 +29,8 @@
 
 using namespace QP;
 
-#define PROC_id        0
 #define TOTAL_OF_DEV   2
-#define cmdSIZE       17
+#define cmdSIZE       18
 #define stoSIZE       30
 
 enum qdSignals {
@@ -46,19 +45,19 @@ enum InternalSignals {
 	LOW_SIG,
 	DONE_SIG,
 	FREQ_SIG,
-	SI_END_LINE_SIG,
 	SI_CHK_ALIVE_SIG,
 	SI_RETURN_SIG
 };
 
-//command-option
-#define ENQUEUE  64
-#define DEQUEUE  128
-#define FLUSH    192
 
-#define ONE_TOK  0
-#define TWO_TOK  2
-#define USE_NUM  3
+//context
+#define ONE_TOK    0
+#define TWO_TOK    2
+#define USE_VAL    3
+#define SENSOR     4
+#define ONE_ARR    8
+#define TWO_ARR   16
+#define ECHO_SUM  32
 
 #define WAVE_DRIVE   0x11
 #define HALF_STEP    0X07
@@ -70,19 +69,38 @@ enum InternalSignals {
 #define CHKSUM       0x08
 #define EMGCY        0x80
 
-#define START() start_time = micros()
-#define STOP() passed_time = micros() - start_time
+#define START() do { \
+		if (!reent) \
+			start_time = micros(); \
+} while(0)
+
+#define STOP()  do { \
+		if ((trig1 || trig2) && (reent == 0)) { \
+			QF_INT_DISABLE(); \
+			passed_time = micros() - start_time; \
+			update = true; \
+			trig1 = false; \
+			trig2 = false; \
+			QF_INT_ENABLE(); \
+		} \
+} while(0)
+
+#define RESULT() do { \
+		if (update) { \
+			update = false; \
+			Serial.print(passed_time); \
+			Serial.write("us\n"); \
+		} \
+} while(0)
+
 #define SEND_CMD(id, dblk)  (((QDevice*)dev_tbl[(id)])->clbkfunc((QDevice*)dev_tbl[(id)], (dblk)))
-#define FORCE_FLUSH(id) (((QDevice*)dev_tbl[(id)])->FlushQueue())
-#define DEQ_CMD(id) (((QDevice*)dev_tbl[(id)])->DequeueCmd())
-#define ENQ_CMD(id, p) (((QDevice*)dev_tbl[(id)])->EnqueueList((p)))
-#define GET_DL() ((Data_List*)m_sto.m_pool.get())
-#define PUT_DL(p) (m_sto.m_pool.put((p)))
 
 struct Cmd_Data {
+	uint16_t chksum;
+	uint8_t devid;
 	uint8_t context;
 	char tok[2][6];
-	int16_t num;
+	int16_t Val;
 };
 
 union Data_Block {
@@ -91,30 +109,44 @@ union Data_Block {
 };
 
 struct Data_List {
-	Data_List*     next;
+	Data_List*  next;
 	Data_Block d_blk;
 };
 
 class DL_Storage {
-public:
-QMPool m_pool;
-DL_Storage();
 private:
+uint8_t blk_cnt;
+QMPool m_pool;
 Data_List dListSto[stoSIZE];
+
+public:
+DL_Storage();
+uint8_t    BlockCount();
+Data_List* getDLBlock();
+void       putDLBlock(Data_List*);
+};
+
+class DL_Queue {
+private:
+uint8_t List_cnt;
+Data_List*  first;
+Data_List*  last;
+
+public:
+uint8_t      ListCount();
+void         EnqueueList(Data_List*);
+Data_List*   DequeueList();
+void         FlushQueue(DL_Storage*);
 };
 //............................................................................
 class QDevice : public QP::QActive {
 public:
 static QActive* dev_tbl[];
 static DL_Storage m_sto;
-typedef     bool (*QDcmdHandler)(QDevice*, Data_Block*);
+typedef    bool (*QDcmdHandler)(QDevice*, Cmd_Data*);
 
 private:
 const uint8_t devID;
-
-Data_List*  first;
-Data_List*  last;
-uint8_t List_cnt;
 
 public:
 const QDcmdHandler clbkfunc;
@@ -126,18 +158,15 @@ QDevice(
         );
 
 uint8_t    getID();
-uint8_t    ListCount();
-void       EnqueueList(Data_List*);
-bool       DequeueCmd();
-void       FlushQueue();
 };
 //............................................................................
 
-class CmdPump : public QDevice {
+class SI : public QDevice {
+
+friend class QP::QK;
 
 public:
-CmdPump(uint8_t);
-void       On_ISR();
+SI(uint8_t);
 
 bool       IsEmgcy()    {
 	return stat_flg & EMGCY;
@@ -147,13 +176,20 @@ private:
 QP::QTimeEvt m_keep_alive_timer;
 volatile uint8_t stat_flg;
 
+DL_Queue work;
+DL_Queue out;
+
 Data_List* lstp;
 char* rp;
 char c;
 
-static bool CmdExecutor(CmdPump*, Data_Block*);
-static QP::QState initial (CmdPump *me, QP::QEvent const *e);
-static QP::QState Exchange (CmdPump *me, QP::QEvent const *e);
+void    Execute();
+void Read(uint8_t);
+void    Dispatch();
+void    Write();
+static bool CmdExecutor(SI*, Cmd_Data*);
+static QP::QState initial (SI *me, QP::QEvent const *e);
+static QP::QState Exchange (SI *me, QP::QEvent const *e);
 };
 
 //............................................................................
@@ -167,7 +203,7 @@ LEDgroup(
         uint8_t,
         uint8_t,
         uint8_t,
-        uint16_t itr = 1000
+        uint16_t itr = 2500
         );
 
 private:
@@ -177,7 +213,7 @@ const uint8_t e_pin;
 uint8_t cur_pin;
 uint16_t itrvl;
 
-static bool CmdExecutor(LEDgroup*, Data_Block*);
+static bool CmdExecutor(LEDgroup*, Cmd_Data*);
 
 static QP::QState initial (LEDgroup *me, QP::QEvent const *e);
 static QP::QState blinkForward(LEDgroup *me, QP::QEvent const *e);

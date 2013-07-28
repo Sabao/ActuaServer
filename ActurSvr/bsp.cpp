@@ -49,14 +49,19 @@ Q_DEFINE_THIS_FILE
 uint8_t l_TIMER2_COMPA;
 #endif
 
-// Command-Pump  -------------------------------------------------------------
-extern CmdPump* p_cp;
+// Serial Interface  -------------------------------------------------------------
+extern SI* p_si;
 unsigned long start_time    = 0;
 unsigned long passed_time   = 0;
-uint16_t max_time      = 0;
+volatile uint8_t reent         = 0;
+volatile bool trig1         = false;
+volatile bool trig2         = true;
+volatile bool update        = false;
+
 // ISRs ----------------------------------------------------------------------
 ISR(TIMER2_COMPA_vect) {
 	START();
+	++reent;
 	// No need to clear the interrupt source since the Timer2 compare
 	// interrupt is automatically cleard in hardware when the ISR runs.
 
@@ -64,11 +69,10 @@ ISR(TIMER2_COMPA_vect) {
 
 	QF::TICK(&l_TIMER2_COMPA);            // process all armed time events
 
-	p_cp->On_ISR();
-
 	QK_ISR_EXIT();                // inform QK kernel about exiting an ISR
 
-
+	--reent;
+	STOP();
 }
 
 //............................................................................
@@ -100,24 +104,21 @@ void QF::onCleanup(void) {
 }
 //............................................................................
 void QK::onIdle() {
-	if (max_time < passed_time) {
-		max_time = passed_time;
-		Serial.print(max_time);
-		Serial.write("us\n");
-	}
+	RESULT();
+	p_si->Execute();
 
 	QF_INT_DISABLE();
 	USER_LED_ON(); // toggle the User LED on Arduino on and off, see NOTE1
 	USER_LED_OFF();
 	QF_INT_ENABLE();
 
-#ifdef SAVE_POWER
+   #ifdef SAVE_POWER
 
 	SMCR = (0 << SM0) | (1 << SE); // idle sleep mode, adjust to your project
 	__asm__ __volatile__ ("sleep" "\n\t" :: );
 	SMCR = 0;                                          // clear the SE bit
 
-#endif
+   #endif
 }
 
 //............................................................................

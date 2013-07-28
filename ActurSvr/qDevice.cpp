@@ -35,19 +35,38 @@ extern QActive* dev_tbl[];
 
 extern unsigned long start_time;
 extern unsigned long passed_time;
-extern uint16_t max_time;
+extern uint8_t reent;
+extern bool trig1;
+extern bool trig2;
+extern bool update;
+extern SI* p_si;
 
 DL_Storage::DL_Storage() {
 	m_pool.init(dListSto, sizeof(dListSto), sizeof(dListSto[0]));
+	blk_cnt = 0;
+}
+
+uint8_t DL_Storage::BlockCount() {
+	return blk_cnt;
+}
+
+Data_List* DL_Storage::getDLBlock() {
+	Data_List* dp;
+	if (dp = ((Data_List*)m_pool.get())) {
+		++blk_cnt;
+	}
+	return dp;
+}
+
+void DL_Storage::putDLBlock(Data_List* dp) {
+	m_pool.put(dp);
+	--blk_cnt;
 }
 
 QDevice::QDevice(uint8_t id, QDcmdHandler p, QStateHandler h)
 	:
 	QActive(h),
 	devID(id), clbkfunc(p) {
-	first     = NULL;
-	last      = NULL;
-	List_cnt  = 0;
 	dev_tbl[ id & 0x3F ] = this;
 }
 
@@ -55,12 +74,12 @@ uint8_t QDevice::getID() {
 	return devID & 0x3F;
 }
 
-uint8_t QDevice::ListCount() {
+uint8_t DL_Queue::ListCount() {
 	return List_cnt;
 }
 
-void QDevice::EnqueueList(Data_List* lp) {
-
+void DL_Queue::EnqueueList(Data_List* lp) {
+	QF_INT_DISABLE();
 	if(last == NULL) {
 		last  = lp;
 		first = last;
@@ -72,19 +91,16 @@ void QDevice::EnqueueList(Data_List* lp) {
 
 	last->next = NULL;
 	++List_cnt;
+	QF_INT_ENABLE();
 };
 
-bool QDevice::DequeueCmd() {
-
+Data_List* DL_Queue::DequeueList() {
+	QF_INT_DISABLE();
 	if(first != NULL) {
-
-		bool ans = false;
 
 		Data_List *temp = first;
 
 		first = NULL;
-
-		ans = (*clbkfunc)(this, &(temp->d_blk));
 
 		if(temp->next != NULL) {
 			first = temp->next;
@@ -93,16 +109,17 @@ bool QDevice::DequeueCmd() {
 			last = NULL;
 		}
 
-		PUT_DL(temp);
 		--List_cnt;
 
-		return ans;
+		return temp;
+	} else {
+		return NULL;
 	}
-	return false;
+	QF_INT_ENABLE();
 };
 
-void QDevice::FlushQueue() {
-
+void DL_Queue::FlushQueue(DL_Storage* sto) {
+	QF_INT_DISABLE();
 	if(first == NULL) {
 		return;
 	}
@@ -113,16 +130,17 @@ void QDevice::FlushQueue() {
 	do {
 
 		nextflush_list = flush_list->next;
-		PUT_DL(flush_list);
+		sto->putDLBlock(flush_list);
 		flush_list = nextflush_list;
 
 	}
 	while(flush_list != NULL);
 	List_cnt = 0;
+	QF_INT_ENABLE();
 }
 
 //............................................................................
-CmdPump::CmdPump(uint8_t id)
+SI::SI(uint8_t id)
 	: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial),
 	m_keep_alive_timer(SI_CHK_ALIVE_SIG)
 {
@@ -130,22 +148,34 @@ CmdPump::CmdPump(uint8_t id)
 	stat_flg |= STAY;
 	stat_flg |= ALIVE;
 
-	lstp  = GET_DL();
+	lstp  = m_sto.getDLBlock();
 	rp  = lstp->d_blk.origin_str;
 	c = '\0';
 }
 
-void CmdPump::On_ISR() {
-	if (stat_flg & EMGCY) {
-		if (Serial.available() > 0) {
+void SI::Execute() {
+	uint8_t n;
+	if (out.ListCount()) {
+		SI::Write();
+		return;
+	} else if (work.ListCount()) {
+		SI::Dispatch();
+		return;
+	} else if (n = Serial.available()) {
+		SI::Read(n);
+		return;
+	}
+}
+
+void SI::Read(uint8_t n) {
+	for(uint8_t i = 0; i < n; ++i) {
+		if (stat_flg & EMGCY) {
 			c = Serial.read();
 			if (c == '^') {
 				QEvent* pe = Q_NEW(QEvent, SI_RETURN_SIG);
 				this->POST(pe, this);
 			}
-		}
-	} else {
-		if (Serial.available() > 0) {
+		} else {
 
 			c = Serial.read();
 
@@ -159,12 +189,9 @@ void CmdPump::On_ISR() {
 				case '(':
 				{
 					*rp = '\0';
-					EnqueueList(lstp);
-					//lstp  = (Data_List*)malloc(sizeof(Data_List));
-					lstp  = GET_DL();
+					work.EnqueueList(lstp);
+					lstp  = m_sto.getDLBlock();
 					rp    = lstp->d_blk.origin_str;
-					QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
-					this->POST(pe, this);
 					break;
 				}
 				case '~':
@@ -180,28 +207,143 @@ void CmdPump::On_ISR() {
 				}
 				}
 			}
-		} else if (ListCount()) {
-			QEvent* pe = Q_NEW(QEvent, SI_END_LINE_SIG);
-			this->POST(pe, this);
 		}
 	}
 }
 
-QState CmdPump::initial(CmdPump *me, QEvent const *e) {
-	me->m_keep_alive_timer.postIn(me, 250);
-	me->subscribe(SI_EMGCY_SIG);
-	return Q_TRAN(&CmdPump::Exchange);
+void SI::Dispatch() {
+	Data_List    *dl      = work.DequeueList();
+	char         *tp      = (dl->d_blk).origin_str;
+	bool err      = false;
+	char         *endp    = NULL;
+	char         *saveptr = NULL;
+
+	uint8_t err_no;
+	char err_code[6][5] = {
+		"?00\n",
+		"?01\n",
+		"?02\n",
+		"?03\n",
+		"?04\n",
+		"?05\n"
+	};
+
+	Cmd_Data cpy_d = {0};
+
+	while(*tp != '\0') {
+		cpy_d.chksum += *tp;
+		++tp;
+	}
+
+	tp = (dl->d_blk).origin_str + 1;
+
+	cpy_d.devid = strtol(tp, &endp, 10);
+	uint8_t id = cpy_d.devid & 0x3F;
+
+	if (tp == endp) {
+		err = true;
+		err_no = 0;
+	}else if(id >= TOTAL_OF_DEV) {
+		err = true;
+		err_no = 1;
+	}else if(dev_tbl[id] == NULL) {
+		err = true;
+		err_no = 2;
+	}else if(!(tp = strchr((dl->d_blk).origin_str, ','))) {
+		err = true;
+		err_no = 3;
+	}
+
+	if (!err) {
+		tp = strtok_r(++tp, ",\n", &saveptr);
+		uint8_t i;
+		for(i = 0; tp != NULL; ++i) {
+			if(i < 2) {
+				strncpy(cpy_d.tok[i], tp, 5);
+			}
+			tp = strtok_r(NULL, ",\n", &saveptr);
+		}
+
+		cpy_d.Val = strtol(cpy_d.tok[1], &endp, 10);
+
+		if (cpy_d.tok[1] != endp) {
+			cpy_d.context += USE_VAL;
+		} else if (i == 2) {
+			cpy_d.context += TWO_TOK;
+		}
+
+		if (i > 2) {
+			err = true;
+			err_no = 4;
+		} else if (!(SEND_CMD(id, &cpy_d))) {
+			err = true;
+			err_no = 5;
+		}
+	}
+
+	if (err) {
+		cpy_d.context = ONE_ARR;
+		strcpy(cpy_d.tok[0], err_code[err_no]);
+	} else {
+		cpy_d.context = ECHO_SUM;
+	}
+
+	(dl->d_blk).cmd_d = cpy_d;
+	out.EnqueueList(dl);
 }
 
-QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
+void SI::Write() {
+
+	Data_List *dl = out.DequeueList();
+
+	uint8_t res[5] = { '\0', '\0', '\0', '\n', '\n' };
+
+	switch((dl->d_blk).cmd_d.context) {
+	case ONE_ARR:
+	{
+		Serial.write((dl->d_blk).cmd_d.tok[0]);
+	}
+	break;
+	case TWO_ARR:
+	{
+		Serial.write((dl->d_blk).cmd_d.tok[0]);
+		Serial.write((dl->d_blk).cmd_d.tok[1]);
+	}
+	break;
+	case SENSOR:
+	{
+		res[0] = '(';
+		res[1] = (dl->d_blk).cmd_d.devid;
+		*((uint16_t*)(res + 2)) = (dl->d_blk).cmd_d.Val;
+		Serial.write(res, 5);
+	}
+	break;
+	case ECHO_SUM:
+	{
+		res[0] = '>';
+		*((uint16_t*)(res + 1)) = (dl->d_blk).cmd_d.chksum;
+		Serial.write(res, 4);
+	}
+	break;
+	default:
+	{
+	}
+	break;
+	}
+
+	m_sto.putDLBlock(dl);
+}
+
+QState SI::initial(SI *me, QEvent const *e) {
+	me->m_keep_alive_timer.postIn(me, 250);
+	me->subscribe(SI_EMGCY_SIG);
+	return Q_TRAN(&SI::Exchange);
+}
+
+QState SI::Exchange(SI *me, QEvent const *e) {
 	switch (e->sig) {
 	case Q_ENTRY_SIG:
 	{
-		return Q_HANDLED();
-	}
-	case SI_END_LINE_SIG:
-	{
-		me->DequeueCmd();
 		return Q_HANDLED();
 	}
 	case SI_CHK_ALIVE_SIG:
@@ -241,110 +383,17 @@ QState CmdPump::Exchange(CmdPump *me, QEvent const *e) {
 	return Q_SUPER(&QHsm::top);
 }
 
-bool CmdPump::CmdExecutor(CmdPump* me, Data_Block* dblk) {
-	char *tp = dblk->origin_str;
-
-	if (me->stat_flg & CHKSUM) {
-		uint8_t out[4] = { '>', '\0', '\0', '\n' };
-
-		while(*tp != '\0') {
-			*((uint16_t*)(out + 1)) += *tp;
-			++tp;
+bool SI::CmdExecutor(SI* me, Cmd_Data* dat) {
+	if (dat->context == ONE_TOK) {
+		if(!strcmp(dat->tok[0], "cksum")) {
+			me->stat_flg |= CHKSUM;
+			return true;
+		} else if(!strcmp(dat->tok[0], "nosum")) {
+			me->stat_flg &= ~CHKSUM;
+			return true;
 		}
-
-		Serial.write(out, 4);
 	}
-	STOP();
-
-	tp = dblk->origin_str + 1;
-	char *endp;
-	uint8_t id = strtol(tp, &endp, 10);
-
-	if (tp == endp) { return false; }
-
-	uint8_t op = id & 0xC0;
-	id = id & 0x3F;
-
-	Data_Block newblk = {0};
-
-	tp = strchr(dblk->origin_str, ',');
-
-	if (tp != NULL) {
-		char *saveptr = NULL;
-		tp = strtok_r(++tp, ",\n", &saveptr);
-		uint8_t i;
-		for(i = 0; tp != NULL; i++) {
-			if(i < 2) {
-				strncpy(newblk.cmd_d.tok[i], tp, 5);
-			}
-			tp = strtok_r(NULL, ",\n", &saveptr);
-		}
-
-		newblk.cmd_d.num = strtol(newblk.cmd_d.tok[1], &endp, 10);
-
-		if (newblk.cmd_d.tok[1] != endp) {
-			newblk.cmd_d.context += USE_NUM;
-		} else if (i == 2) {
-			newblk.cmd_d.context += TWO_TOK;
-		} else if (i > 2) {
-			return false;
-		}
-	} else {
-		return false;
-	}
-
-	if( (id <= TOTAL_OF_DEV) && (dev_tbl[id] != NULL)) {
-
-		bool ans = false;
-
-		if (id == me->getID()) {
-			if (newblk.cmd_d.context == ONE_TOK) {
-				if(!strcmp(newblk.cmd_d.tok[0], "cksum")) {
-					me->stat_flg |= CHKSUM;
-					return true;
-				} else if(!strcmp(newblk.cmd_d.tok[0], "nosum")) {
-					me->stat_flg &= ~CHKSUM;
-					return true;
-				}
-			}
-			return false;
-
-		} else {
-			switch (op) {
-
-			case ENQUEUE:
-			{
-				Data_List*  pList;
-				if (pList = GET_DL()) {
-					pList->d_blk.cmd_d = newblk.cmd_d;
-				} else {
-					return false;
-				}
-				ENQ_CMD(id, pList);
-				ans = true;
-				break;
-			}
-			case DEQUEUE:
-			{
-				ans = DEQ_CMD(id);
-				break;
-			}
-			case FLUSH:
-			{
-				FORCE_FLUSH(id);
-				ans = true;
-			}
-			default:
-			{
-				ans = SEND_CMD(id, &newblk);
-				break;
-			}
-			}
-		}
-		return ans;
-	} else {
-		return false;
-	}
+	return false;
 }
 //............................................................................
 
@@ -374,6 +423,7 @@ QState LEDgroup::blinkForward(LEDgroup *me, QEvent const *e) {
 	}
 	case TIMEOUT_SIG:
 	{
+		trig1 = true;
 		digitalWrite(me->cur_pin, LOW);
 		++me->cur_pin;
 		digitalWrite(me->cur_pin, HIGH);
@@ -395,6 +445,8 @@ QState LEDgroup::blinkBackward(LEDgroup *me, QEvent const *e) {
 	}
 	case TIMEOUT_SIG:
 	{
+		delayMicroseconds(200);
+		trig1 = true;
 		digitalWrite(me->cur_pin, LOW);
 		--me->cur_pin;
 		digitalWrite(me->cur_pin, HIGH);
@@ -408,12 +460,12 @@ QState LEDgroup::blinkBackward(LEDgroup *me, QEvent const *e) {
 	return Q_SUPER(&QHsm::top);
 }
 
-bool LEDgroup::CmdExecutor(LEDgroup* me, Data_Block* p) {
+bool LEDgroup::CmdExecutor(LEDgroup* me, Cmd_Data* dat) {
 
-	if (p->cmd_d.context == USE_NUM) {
-		if(!strcmp(p->cmd_d.tok[0], "itrvl")) {
-			if(p->cmd_d.num > 0) {
-				me->itrvl = p->cmd_d.num;
+	if (dat->context == USE_VAL) {
+		if(!strcmp(dat->tok[0], "itrvl")) {
+			if(dat->Val > 0) {
+				me->itrvl = dat->Val;
 				me->m_timeEvt.rearm(me->itrvl);
 				return true;
 			}

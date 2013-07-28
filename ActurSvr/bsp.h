@@ -28,7 +28,7 @@
 #include <avr/io.h>                                                 // AVR I/O
 
 // Sys timer tick per seconds
-#define BSP_TICKS_PER_SEC    1000
+#define BSP_TICKS_PER_SEC    5000
 
 void BSP_init(void);
 
