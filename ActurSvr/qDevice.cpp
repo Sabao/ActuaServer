@@ -41,6 +41,22 @@ extern bool trig2;
 extern bool update;
 extern SI* p_si;
 
+char err_msg0[] PROGMEM = "?00\n";
+char err_msg1[] PROGMEM = "?01\n";
+char err_msg2[] PROGMEM = "?02\n";
+char err_msg3[] PROGMEM = "?03\n";
+char err_msg4[] PROGMEM = "?04\n";
+char err_msg5[] PROGMEM = "?05\n";
+
+PGM_P SI::err_code[6] PROGMEM = {
+	err_msg0,
+	err_msg1,
+	err_msg2,
+	err_msg3,
+	err_msg4,
+	err_msg5
+};
+
 DL_Storage::DL_Storage() {
 	m_pool.init(dListSto, sizeof(dListSto), sizeof(dListSto[0]));
 	blk_cnt = 0;
@@ -150,7 +166,17 @@ SI::SI(uint8_t id)
 
 	lstp  = m_sto.getDLBlock();
 	rp  = lstp->d_blk.origin_str;
+	ctrlcnt = 0;
 	c = '\0';
+}
+
+void SI::writeStatus(uint8_t id, uint16_t val) {
+	if (val > 1023) return;
+	Data_List* ws  = m_sto.getDLBlock();
+	(ws->d_blk).cmd_d.context = S_STATUS;
+	(ws->d_blk).cmd_d.devid = id;
+	(ws->d_blk).cmd_d.Val = val;
+	out.EnqueueList(ws);
 }
 
 void SI::Execute() {
@@ -169,43 +195,52 @@ void SI::Execute() {
 
 void SI::Read(uint8_t n) {
 	for(uint8_t i = 0; i < n; ++i) {
-		if (stat_flg & EMGCY) {
-			c = Serial.read();
+
+		c = Serial.read();
+
+		if (IsEmgcy()) {
+
 			if (c == '^') {
 				QEvent* pe = Q_NEW(QEvent, SI_RETURN_SIG);
 				this->POST(pe, this);
 			}
 		} else {
-
-			c = Serial.read();
-
-			if(c == '\0') { return; }
-
-			*rp++ = c;
-
-			if (c == '\n' || ((rp - (lstp->d_blk.origin_str)) > (cmdSIZE - 2))) {
-				switch (*(lstp->d_blk.origin_str)) {
-				case '<':
-				case '(':
-				{
+			if (ctrlcnt == -1) {
+				*rp++ = c;
+				if (c == '\n') {
 					*rp = '\0';
-					work.EnqueueList(lstp);
-					lstp  = m_sto.getDLBlock();
+					ctrlcnt = -2;
+				} else if ((rp - (lstp->d_blk.origin_str)) > (cmdSIZE - 2)) {
 					rp    = lstp->d_blk.origin_str;
-					break;
+					ctrlcnt = 0;
 				}
+			} else if (ctrlcnt == 0) {
+				switch (c) {
 				case '~':
-				{
 					stat_flg &= ~STAY;
 					stat_flg |= ALIVE;
 					break;
-				}
+				case '<':
+					ctrlcnt = -1;
+					*rp++ = c;
+					break;
+				case '*':
+					ctrlcnt = 6;
+					*rp++ = c;
+					break;
 				default:
-				{
-					rp    = lstp->d_blk.origin_str;
 					break;
 				}
-				}
+			} else if (ctrlcnt > 0) {
+				*rp++ = c;
+				if ((--ctrlcnt) == 0) ctrlcnt = -2;
+			}
+
+			if (ctrlcnt == -2) {
+				work.EnqueueList(lstp);
+				lstp  = m_sto.getDLBlock();
+				rp    = lstp->d_blk.origin_str;
+				ctrlcnt = 0;
 			}
 		}
 	}
@@ -219,109 +254,108 @@ void SI::Dispatch() {
 	char         *saveptr = NULL;
 
 	uint8_t err_no;
-	char err_code[6][5] = {
-		"?00\n",
-		"?01\n",
-		"?02\n",
-		"?03\n",
-		"?04\n",
-		"?05\n"
-	};
+
+
 
 	Cmd_Data cpy_d = {0};
 
-	while(*tp != '\0') {
-		cpy_d.chksum += *tp;
-		++tp;
-	}
+	switch (*tp) {
+	case '<':
+	{
+		while(*tp != '\0') {
+			cpy_d.chksum += *tp;
+			++tp;
+		}
 
-	tp = (dl->d_blk).origin_str + 1;
+		tp = (dl->d_blk).origin_str + 1;
 
-	cpy_d.devid = strtol(tp, &endp, 10);
-	uint8_t id = cpy_d.devid & 0x3F;
+		cpy_d.devid = strtol(tp, &endp, 10);
+		uint8_t id = cpy_d.devid & 0x3F;
 
-	if (tp == endp) {
-		err = true;
-		err_no = 0;
-	}else if(id >= TOTAL_OF_DEV) {
-		err = true;
-		err_no = 1;
-	}else if(dev_tbl[id] == NULL) {
-		err = true;
-		err_no = 2;
-	}else if(!(tp = strchr((dl->d_blk).origin_str, ','))) {
-		err = true;
-		err_no = 3;
-	}
+		if (tp == endp) {
+			err = true;
+			err_no = 0;
+		}else if(id >= TOTAL_OF_DEV) {
+			err = true;
+			err_no = 1;
+		}else if(dev_tbl[id] == NULL) {
+			err = true;
+			err_no = 2;
+		}else if(!(tp = strchr((dl->d_blk).origin_str, ','))) {
+			err = true;
+			err_no = 3;
+		}
 
-	if (!err) {
-		tp = strtok_r(++tp, ",\n", &saveptr);
-		uint8_t i;
-		for(i = 0; tp != NULL; ++i) {
-			if(i < 2) {
-				strncpy(cpy_d.tok[i], tp, 5);
+		if (!err) {
+			tp = strtok_r(++tp, ",\n", &saveptr);
+			uint8_t i;
+			for(i = 0; tp != NULL; ++i) {
+				if(i < 2) {
+					strlcpy(cpy_d.tok[i], tp, 6);
+				}
+				tp = strtok_r(NULL, ",\n", &saveptr);
 			}
-			tp = strtok_r(NULL, ",\n", &saveptr);
+
+			cpy_d.Val = strtol(cpy_d.tok[1], &endp, 10);
+
+			if (cpy_d.tok[1] != endp) {
+				cpy_d.context += USE_VAL;
+			} else if (i == 2) {
+				cpy_d.context += TWO_TOK;
+			}
+
+			if (i > 2) {
+				err = true;
+				err_no = 4;
+			} else if (!(SEND_CMD(id, &cpy_d))) {
+				err = true;
+				err_no = 5;
+			}
 		}
 
-		cpy_d.Val = strtol(cpy_d.tok[1], &endp, 10);
-
-		if (cpy_d.tok[1] != endp) {
-			cpy_d.context += USE_VAL;
-		} else if (i == 2) {
-			cpy_d.context += TWO_TOK;
+		if (err) {
+			cpy_d.context = ERR;
+			strlcpy_P(cpy_d.tok[0], (PGM_P)pgm_read_word(&(err_code[err_no])), 5);
+		} else {
+			cpy_d.context = ECHO_SUM;
 		}
 
-		if (i > 2) {
-			err = true;
-			err_no = 4;
-		} else if (!(SEND_CMD(id, &cpy_d))) {
-			err = true;
-			err_no = 5;
-		}
+		(dl->d_blk).cmd_d = cpy_d;
+		out.EnqueueList(dl);
 	}
-
-	if (err) {
-		cpy_d.context = ONE_ARR;
-		strcpy(cpy_d.tok[0], err_code[err_no]);
-	} else {
-		cpy_d.context = ECHO_SUM;
+	break;
+	case '*':
+	{
 	}
-
-	(dl->d_blk).cmd_d = cpy_d;
-	out.EnqueueList(dl);
+	}
 }
 
 void SI::Write() {
 
 	Data_List *dl = out.DequeueList();
 
-	uint8_t res[5] = { '\0', '\0', '\0', '\n', '\n' };
+	uint8_t res[4] = { 0 };
 
 	switch((dl->d_blk).cmd_d.context) {
-	case ONE_ARR:
+	case ERR:
 	{
 		Serial.write((dl->d_blk).cmd_d.tok[0]);
 	}
 	break;
-	case TWO_ARR:
+	case S_STATUS:
 	{
-		Serial.write((dl->d_blk).cmd_d.tok[0]);
-		Serial.write((dl->d_blk).cmd_d.tok[1]);
-	}
-	break;
-	case SENSOR:
-	{
-		res[0] = '(';
-		res[1] = (dl->d_blk).cmd_d.devid;
-		*((uint16_t*)(res + 2)) = (dl->d_blk).cmd_d.Val;
-		Serial.write(res, 5);
+		res[0] = '@';
+		*((uint16_t*)(res + 1)) = (dl->d_blk).cmd_d.Val;
+		res[1] |= (((dl->d_blk).cmd_d.devid) << 2);
+		res[3] = res[1] + res[2];
+		Serial.write(res, 4);
 	}
 	break;
 	case ECHO_SUM:
 	{
 		res[0] = '>';
 		*((uint16_t*)(res + 1)) = (dl->d_blk).cmd_d.chksum;
+		res[3] = res[1] + res[2];
 		Serial.write(res, 4);
 	}
 	break;

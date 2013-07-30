@@ -26,6 +26,7 @@
 
 #include "qp_port.h"
 #include <stdlib.h>
+#include <avr/pgmspace.h>
 
 using namespace QP;
 
@@ -54,10 +55,9 @@ enum InternalSignals {
 #define ONE_TOK    0
 #define TWO_TOK    2
 #define USE_VAL    3
-#define SENSOR     4
-#define ONE_ARR    8
-#define TWO_ARR   16
-#define ECHO_SUM  32
+#define S_STATUS   4
+#define ERR        8
+#define ECHO_SUM  16
 
 #define WAVE_DRIVE   0x11
 #define HALF_STEP    0X07
@@ -172,7 +172,10 @@ bool       IsEmgcy()    {
 	return stat_flg & EMGCY;
 };
 
+void writeStatus(uint8_t, uint16_t);
+
 private:
+static PGM_P err_code[];
 QP::QTimeEvt m_keep_alive_timer;
 volatile uint8_t stat_flg;
 
@@ -180,6 +183,7 @@ DL_Queue work;
 DL_Queue out;
 
 Data_List* lstp;
+int8_t ctrlcnt;
 char* rp;
 char c;
 

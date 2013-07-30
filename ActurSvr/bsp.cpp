@@ -104,7 +104,7 @@ void QF::onCleanup(void) {
 }
 //............................................................................
 void QK::onIdle() {
-	RESULT();
+	//RESULT();
 	p_si->Execute();
 
 	QF_INT_DISABLE();
