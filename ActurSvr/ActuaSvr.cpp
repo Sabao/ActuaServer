@@ -31,12 +31,13 @@ Q_DEFINE_THIS_FILE
    Add all devices here.
    Count number of devices, and MODIFY macro 'TOTAL_OF_DEV' definition in qDevice.h.
  */
+SI ao(0);
+LEDgroup ao1(1, 9, 11);
 
-static SI l_si(0); //SI objects(Do not delete!)
-static LEDgroup ledgroup(1,9,11);
-
+SI* p_ao0 = &ao;
 //Pointer that this application depends ---------------------------------------
-SI* p_si = &l_si; //(Do not delete!)
 //ServoTact* p_tact = &;
+
+//LEDgroup* pled = &ledgroup;
 
 //////////////////////////////////////////////////////////////////////////////

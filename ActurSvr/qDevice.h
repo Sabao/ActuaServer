@@ -30,7 +30,7 @@
 
 using namespace QP;
 
-#define TOTAL_OF_DEV   2
+#define TOTAL_OF_DEV  2
 #define cmdSIZE       18
 #define stoSIZE       30
 
@@ -66,7 +66,6 @@ enum InternalSignals {
 #define STAY         0x01
 #define ALIVE        0x02
 #define CHKECHO      0x04
-#define CHKSUM       0x08
 #define EMGCY        0x80
 
 #define START() do { \
@@ -94,6 +93,10 @@ enum InternalSignals {
 } while(0)
 
 #define SEND_CMD(id, dblk)  (((QDevice*)dev_tbl[(id)])->clbkfunc((QDevice*)dev_tbl[(id)], (dblk)))
+#define TOKEN1 tok[0][5]
+#define TOKEN2 tok[1][5]
+
+#define QD_TOKEN(pref, suf, str) str,
 
 struct Cmd_Data {
 	uint16_t chksum;
@@ -141,20 +144,25 @@ void         FlushQueue(DL_Storage*);
 //............................................................................
 class QDevice : public QP::QActive {
 public:
-static QActive* dev_tbl[];
-static DL_Storage m_sto;
 typedef    bool (*QDcmdHandler)(QDevice*, Cmd_Data*);
+static QActive* dev_tbl[];
+static PGM_P tok_tbl[];
+static DL_Storage m_sto;
+
+QDcmdHandler const clbkfunc;
+uint8_t const tok_start;
+uint8_t const tok_end;
 
 private:
-const uint8_t devID;
+uint8_t const devID;
 
 public:
-const QDcmdHandler clbkfunc;
-
 QDevice(
         uint8_t,
         QDcmdHandler,
-        QP::QStateHandler
+        QP::QStateHandler,
+        uint8_t = 0,
+        uint8_t = 0
         );
 
 uint8_t    getID();
@@ -175,7 +183,13 @@ bool       IsEmgcy()    {
 void writeStatus(uint8_t, uint16_t);
 
 private:
+
+enum {
+	QD_TOKEN(si, 0, hello)
+};
+
 static PGM_P err_code[];
+
 QP::QTimeEvt m_keep_alive_timer;
 volatile uint8_t stat_flg;
 
@@ -191,6 +205,8 @@ void    Execute();
 void Read(uint8_t);
 void    Dispatch();
 void    Write();
+int8_t Seek(const char*, const uint8_t, const uint8_t);
+
 static bool CmdExecutor(SI*, Cmd_Data*);
 static QP::QState initial (SI *me, QP::QEvent const *e);
 static QP::QState Exchange (SI *me, QP::QEvent const *e);
@@ -211,6 +227,11 @@ LEDgroup(
         );
 
 private:
+
+enum {
+	QD_TOKEN(led, 1, itvl)
+};
+
 const uint8_t s_pin;
 const uint8_t e_pin;
 
@@ -224,6 +245,5 @@ static QP::QState blinkForward(LEDgroup *me, QP::QEvent const *e);
 static QP::QState blinkBackward(LEDgroup *me, QP::QEvent const *e);
 };
 //............................................................................
-
 #endif
 

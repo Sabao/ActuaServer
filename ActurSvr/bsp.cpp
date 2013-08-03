@@ -50,7 +50,7 @@ uint8_t l_TIMER2_COMPA;
 #endif
 
 // Serial Interface  -------------------------------------------------------------
-extern SI* p_si;
+extern SI* p_ao0;
 unsigned long start_time    = 0;
 unsigned long passed_time   = 0;
 volatile uint8_t reent         = 0;
@@ -105,7 +105,7 @@ void QF::onCleanup(void) {
 //............................................................................
 void QK::onIdle() {
 	//RESULT();
-	p_si->Execute();
+	p_ao0->Execute();
 
 	QF_INT_DISABLE();
 	USER_LED_ON(); // toggle the User LED on Arduino on and off, see NOTE1

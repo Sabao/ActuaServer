@@ -28,8 +28,10 @@
 
 using namespace QP;
 
-QActive* QDevice::dev_tbl[TOTAL_OF_DEV] = {NULL};
+extern SI* p_ao0;
+QActive* QDevice::dev_tbl[TOTAL_OF_DEV] = { static_cast<QActive *>(0) };
 DL_Storage QDevice::m_sto;
+
 // Local-scope objects -------------------------------------------------------
 
 static union SmallEvents {
@@ -49,7 +51,7 @@ void setup() {
 	QF::psInit(l_subscrSto, Q_DIM(l_subscrSto)); // init publish-subscribe
 
 	for (uint8_t n = 0U; n < TOTAL_OF_DEV; ++n) {
-		if(QDevice::dev_tbl[n] != NULL) {
+		if(QDevice::dev_tbl[n] != static_cast<QActive *>(0)) {
 			QDevice::dev_tbl[n]->start((uint8_t)(n + 1U),
 			                           l_DeviceQueueSto[n], Q_DIM(l_DeviceQueueSto[n]),
 			                           (void *)0, 0U);
