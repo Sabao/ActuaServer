@@ -41,32 +41,29 @@ extern bool trig2;
 extern bool update;
 extern SI* p_ao0;
 
-char errmsg0[] PROGMEM = "?00\n";
-char errmsg1[] PROGMEM = "?01\n";
-char errmsg2[] PROGMEM = "?02\n";
-char errmsg3[] PROGMEM = "?03\n";
-char errmsg4[] PROGMEM = "?04\n";
-char errmsg5[] PROGMEM = "?05\n";
-
-PGM_P SI::err_code[] PROGMEM = {
-	errmsg0,
-	errmsg1,
-	errmsg2,
-	errmsg3,
-	errmsg4,
-	errmsg5
-};
 //BEGIN OF COMMAND TOKEN DEFINITIONS////////////////////////////////////////
 #define QD_TOKEN(pref, suf, str) char pref ## _tok_ ## suf[] PROGMEM = #str;
 //Store string in the program memory
-QD_TOKEN(si, 0, hello)
-QD_TOKEN(led, 1, itvl)
+QD_TOKEN(err, 0, E000)
+QD_TOKEN(err, 1, E001)
+QD_TOKEN(err, 2, E002)
+QD_TOKEN(err, 3, E003)
+QD_TOKEN(err, 4, E004)
+QD_TOKEN(err, 5, E005)
+QD_TOKEN(si,  6, hello)
+QD_TOKEN(led, 7, itvl)
 
 #define QD_TOKEN(pref, suf, str) pref ## _tok_ ## suf,
 //Pointer array from here
 PGM_P QDevice::tok_tbl[] PROGMEM = {
-	QD_TOKEN(si, 0, hello)
-	QD_TOKEN(led, 1, itvl)
+QD_TOKEN(err, 0, E000)
+QD_TOKEN(err, 1, E001)
+QD_TOKEN(err, 2, E002)
+QD_TOKEN(err, 3, E003)
+QD_TOKEN(err, 4, E004)
+QD_TOKEN(err, 5, E005)
+QD_TOKEN(si,  6, hello)
+QD_TOKEN(led, 7, itvl)
 };
 //END OF COMMAND TOKEN DEFINITIONS/////////////////////////////////////////
 
@@ -173,7 +170,7 @@ void DL_Queue::FlushQueue(DL_Storage* sto) {
 
 //............................................................................
 SI::SI(uint8_t id)
-	: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial, 0, 0),
+	: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial, 6, 6),
 	m_keep_alive_timer(SI_CHK_ALIVE_SIG)
 {
 	stat_flg = 0x00;
@@ -336,7 +333,7 @@ void SI::Dispatch() {
 
 		if (err) {
 			cpy_d.context = ERR;
-			strlcpy_P(cpy_d.tok[0], (PGM_P)pgm_read_word(&(err_code[err_no])), 5);
+			strlcpy_P(cpy_d.tok[0], (PGM_P)pgm_read_word(&(tok_tbl[err_no])), 5);
 		} else {
 			cpy_d.context = ECHO_SUM;
 		}
@@ -360,7 +357,7 @@ void SI::Write() {
 	switch((dl->d_blk).cmd_d.context) {
 	case ERR:
 	{
-		Serial.write((dl->d_blk).cmd_d.tok[0]);
+		Serial.write(((uint8_t*)(dl->d_blk).cmd_d.tok[0]), 4);
 	}
 	break;
 	case S_STATUS:
@@ -463,7 +460,7 @@ bool SI::CmdExecutor(SI* me, Cmd_Data* dat) {
 //............................................................................
 
 LEDgroup::LEDgroup(uint8_t id, uint8_t s, uint8_t e, uint16_t itr)
-	: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial, 1, 1),
+	: QDevice(id, (QDcmdHandler)CmdExecutor, (QStateHandler)initial, 7, 7),
 	m_timeEvt(TIMEOUT_SIG), s_pin(s), e_pin(e) {
 	cur_pin = s;
 	itrvl = itr;

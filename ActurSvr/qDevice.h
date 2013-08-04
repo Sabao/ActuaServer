@@ -185,10 +185,8 @@ void writeStatus(uint8_t, uint16_t);
 private:
 
 enum {
-	QD_TOKEN(si, 0, hello)
+QD_TOKEN(si,  6, hello)
 };
-
-static PGM_P err_code[];
 
 QP::QTimeEvt m_keep_alive_timer;
 volatile uint8_t stat_flg;
@@ -229,7 +227,7 @@ LEDgroup(
 private:
 
 enum {
-	QD_TOKEN(led, 1, itvl)
+QD_TOKEN(led, 7, itvl)
 };
 
 const uint8_t s_pin;
